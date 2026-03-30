@@ -10,6 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "userInterfaceStyle": "light",
       "bundleIdentifier": "com.appinfor.stag",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

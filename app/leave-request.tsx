@@ -270,6 +270,9 @@ export default function LeaveRequestScreen() {
                                     mode="date"
                                     display="inline"
                                     minimumDate={minDate}
+                                    textColor="#11181C"
+                                    themeVariant="light"
+                                    accentColor="#0D9488"
                                     onChange={(event, date) => {
                                         if (date) {
                                             setStartDate(date);
@@ -294,6 +297,9 @@ export default function LeaveRequestScreen() {
                                     mode="date"
                                     display="inline"
                                     minimumDate={startDate}
+                                    textColor="#11181C"
+                                    themeVariant="light"
+                                    accentColor="#0D9488"
                                     onChange={(event, date) => {
                                         if (date) setEndDate(date);
                                         if (Platform.OS === 'android') setShowEndPicker(false);

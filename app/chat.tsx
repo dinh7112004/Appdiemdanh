@@ -164,7 +164,7 @@ export default function ChatScreen() {
         <KeyboardAvoidingView
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFF',
         borderTopWidth: 1,
         borderTopColor: '#EEE',
-        paddingBottom: Platform.OS === 'ios' ? 35 : 12
+        paddingBottom: Platform.OS === 'ios' ? 20 : 12
     },
     input: {
         flex: 1,

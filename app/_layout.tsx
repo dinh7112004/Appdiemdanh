@@ -82,12 +82,34 @@ export default function RootLayout() {
       console.log("🚀 Push Token hệ thống:", token);
     });
 
+    // 🟢 THÊM ĐOẠN NÀY ĐỂ XỬ LÝ KHI APP BỊ TẮT HẲN (KILLED STATE)
+    Notifications.getLastNotificationResponseAsync().then((response: any) => {
+      if (response && response.notification.request.content.data) {
+        const data = response.notification.request.content.data;
+        if (data?.type) {
+          const routes: any = {
+            'LEAVE': '/leave-request',
+            'LEAVE_STATUS': '/leave-request',
+            'CHAT': '/chat',
+            'TASK': '/(tabs)/tasks',
+            'ATTENDANCE': '/(tabs)'
+          };
+
+          // Dùng setTimeout để nhường đường cho Auth Guard chạy xong trước (đẩy vào tabs), 
+          // sau đó mình mới đè màn hình Chat lên trên.
+          setTimeout(() => {
+            router.push(routes[data.type] || '/notifications');
+          }, 800);
+        }
+      }
+    });
+
     const subscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
       const data = response.notification.request.content.data;
       if (data?.type) {
         const routes: any = {
           'LEAVE': '/leave-request',
-          'LEAVE_STATUS': '/(tabs)/history',
+          'LEAVE_STATUS': '/leave-request',
           'CHAT': '/chat',
           'TASK': '/(tabs)/tasks',
           'ATTENDANCE': '/(tabs)'
