@@ -3,7 +3,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Calendar, Camera, CheckCircle2, ChevronLeft, ChevronRight, Clock, Send, X, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Camera, CheckCircle2, ChevronLeft, ChevronRight, Clock, Send, X, XCircle } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -39,6 +39,7 @@ export default function LeaveRequestScreen() {
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
     const [image, setImage] = useState<string | null>(null);
+    const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
     const [loading, setLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -46,26 +47,30 @@ export default function LeaveRequestScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [showFullHistory, setShowFullHistory] = useState(false);
 
+    // Tính toán minDate không được reset giờ về 00:00 nữa
     const minDate = useMemo(() => {
         const date = new Date();
-        date.setHours(0, 0, 0, 0);
-
         if (leaveType === 'ANNUAL') {
-            date.setDate(date.getDate() + 1);
+            date.setDate(date.getDate() + 1); // Ngày mai
+            date.setHours(8, 0, 0, 0); // Mặc định 8h sáng
             return date;
         } else if (leaveType === 'PERSONAL') {
-            return date;
+            return date; // Ngay lúc này
         } else {
-            return undefined;
+            return undefined; // Nghỉ ốm cho phép chọn quá khứ
         }
     }, [leaveType]);
 
+    // Tự động cập nhật Start/End date nếu vi phạm minDate khi đổi loại nghỉ
     useEffect(() => {
         if (minDate && startDate < minDate) {
-            setStartDate(new Date(minDate));
-            if (endDate < minDate) {
-                setEndDate(new Date(minDate));
-            }
+            const newStart = new Date(minDate);
+            setStartDate(newStart);
+
+            // Set endDate trễ hơn startDate 2 tiếng làm mặc định
+            const newEnd = new Date(newStart);
+            newEnd.setHours(newStart.getHours() + 2);
+            setEndDate(newEnd);
         }
     }, [leaveType]);
 
@@ -116,31 +121,30 @@ export default function LeaveRequestScreen() {
     };
 
     const handleSubmit = async () => {
-        if (startDate > endDate) return Alert.alert("Lỗi", "Ngày bắt đầu không thể sau ngày kết thúc.");
+        if (startDate >= endDate) return Alert.alert("Lỗi", "Thời gian bắt đầu phải trước thời gian kết thúc.");
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const startCheck = new Date(startDate);
-        startCheck.setHours(0, 0, 0, 0);
-        const endCheck = new Date(endDate);
-        endCheck.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const msPerHour = 1000 * 60 * 60;
 
-        const msPerDay = 1000 * 60 * 60 * 24;
-        const noticeDays = Math.ceil((startCheck.getTime() - today.getTime()) / msPerDay);
-        const durationDays = Math.ceil((endCheck.getTime() - startCheck.getTime()) / msPerDay) + 1;
+        // Tính toán khoảng cách bằng Giờ thay vì Ngày
+        const noticeHours = (startDate.getTime() - now.getTime()) / msPerHour;
+        const durationHours = (endDate.getTime() - startDate.getTime()) / msPerHour;
 
         if (leaveType === 'ANNUAL') {
-            if (durationDays <= 1 && noticeDays < 1) {
-                return Alert.alert("Sai quy định", "Nghỉ 1 ngày cần báo trước ít nhất 1 ngày.");
+            // <= 24h (1 ngày) -> Báo trước 24h
+            if (durationHours <= 24 && noticeHours < 24) {
+                return Alert.alert("Sai quy định", "Nghỉ ≤ 1 ngày (24h) cần báo trước ít nhất 1 ngày.");
             }
-            if (durationDays > 1 && durationDays <= 5 && noticeDays < 2) {
-                return Alert.alert("Sai quy định", `Bạn xin nghỉ ${durationDays} ngày. Theo quy định phải báo trước ít nhất 2 ngày.`);
+            // > 24h đến 120h (5 ngày) -> Báo trước 48h
+            if (durationHours > 24 && durationHours <= 120 && noticeHours < 48) {
+                return Alert.alert("Sai quy định", `Bạn xin nghỉ dài. Theo quy định phải báo trước ít nhất 2 ngày.`);
             }
-            if (durationDays > 5 && noticeDays < 7) {
-                return Alert.alert("Sai quy định", `Bạn xin nghỉ dài hạn (${durationDays} ngày). Theo quy định phải báo trước ít nhất 1 tuần (7 ngày).`);
+            // > 120h -> Báo trước 168h (7 ngày)
+            if (durationHours > 120 && noticeHours < 168) {
+                return Alert.alert("Sai quy định", `Bạn xin nghỉ dài hạn. Theo quy định phải báo trước ít nhất 1 tuần.`);
             }
         } else if (leaveType === 'PERSONAL') {
-            if (noticeDays < 0) return Alert.alert("Sai quy định", "Không thể xin nghỉ việc riêng cho những ngày trong quá khứ.");
+            if (startDate < now) return Alert.alert("Sai quy định", "Không thể xin nghỉ việc riêng cho thời gian trong quá khứ.");
         }
 
         if (!reason.trim()) return Alert.alert("Lỗi", "Vui lòng nhập lý do nghỉ.");
@@ -152,8 +156,14 @@ export default function LeaveRequestScreen() {
             const formData = new FormData();
             formData.append('userId', currentUser.id || currentUser._id);
             formData.append('leaveType', leaveType);
-            formData.append('startDate', startDate.toLocaleDateString('vi-VN'));
-            formData.append('endDate', endDate.toLocaleDateString('vi-VN'));
+
+            const formatDT = (d: Date) => {
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+
+            formData.append('startDate', formatDT(startDate));
+            formData.append('endDate', formatDT(endDate));
             formData.append('reason', reason);
 
             if (image) {
@@ -210,6 +220,12 @@ export default function LeaveRequestScreen() {
         </View>
     );
 
+    // Hàm tiện ích format hiển thị: "08:30 - 25/10/2023"
+    const formatDisplay = (date: Date) => {
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        return `${pad(date.getHours())}:${pad(date.getMinutes())} - ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -236,82 +252,138 @@ export default function LeaveRequestScreen() {
                             ))}
                         </View>
 
-                        {leaveType === 'ANNUAL' && <Text style={styles.ruleAlert}>* Luật: Nghỉ 1 ngày (Báo trước 1 ngày) • Nghỉ 2-5 ngày (Báo trước 2 ngày) • Trên 5 ngày (Báo trước 1 tuần)</Text>}
+                        {leaveType === 'ANNUAL' && <Text style={styles.ruleAlert}>* Luật: Nghỉ ≤ 1 ngày (Báo trước 1 ngày) • Nghỉ 2-5 ngày (Báo trước 2 ngày) • Trên 5 ngày (Báo trước 1 tuần)</Text>}
                         {leaveType === 'SICK' && <Text style={[styles.ruleAlert, { color: '#E11D48' }]}>* Mẹo: Có thể chọn ngày quá khứ để nộp bù đơn.</Text>}
 
-                        {/* ROW CHỌN NGÀY */}
-                        <View style={styles.row}>
+                        {/* ROW CHỌN NGÀY GIỜ */}
+                        <View style={styles.timeBlock}>
+                            <Text style={styles.timeLabel}>Từ (Giờ & Ngày):</Text>
                             <TouchableOpacity
-                                style={[styles.inputBox, { flex: 1 }, showStartPicker && styles.inputBoxActive]}
-                                onPress={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false); }}
+                                style={[styles.inputBox, showStartPicker && styles.inputBoxActive]}
+                                onPress={() => {
+                                    setPickerMode('date');
+                                    setShowStartPicker(!showStartPicker);
+                                    setShowEndPicker(false);
+                                }}
                             >
-                                <Calendar size={16} color={showStartPicker ? "#0D9488" : "#64748B"} />
+                                <Clock size={16} color={showStartPicker ? "#0D9488" : "#64748B"} />
                                 <Text style={[styles.inputText, showStartPicker && { color: "#0D9488", fontWeight: '700' }]}>
-                                    {startDate.toLocaleDateString('vi-VN')}
+                                    {formatDisplay(startDate)}
                                 </Text>
                             </TouchableOpacity>
-                            <View style={{ width: 10 }} />
-                            <TouchableOpacity
-                                style={[styles.inputBox, { flex: 1 }, showEndPicker && styles.inputBoxActive]}
-                                onPress={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false); }}
-                            >
-                                <Calendar size={16} color={showEndPicker ? "#0D9488" : "#64748B"} />
-                                <Text style={[styles.inputText, showEndPicker && { color: "#0D9488", fontWeight: '700' }]}>
-                                    {endDate.toLocaleDateString('vi-VN')}
-                                </Text>
-                            </TouchableOpacity>
+
+                            {/* HIỂN THỊ LỊCH INLINE BẮT ĐẦU */}
+                            {showStartPicker && (
+                                <View style={styles.inlinePickerContainer}>
+                                    <View style={styles.pickerTabs}>
+                                        <TouchableOpacity
+                                            style={[styles.pickerTab, pickerMode === 'date' && styles.pickerTabActive]}
+                                            onPress={() => setPickerMode('date')}
+                                        >
+                                            <Text style={[styles.pickerTabText, pickerMode === 'date' && styles.pickerTabTextActive]}>Chọn Ngày</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.pickerTab, pickerMode === 'time' && styles.pickerTabActive]}
+                                            onPress={() => setPickerMode('time')}
+                                        >
+                                            <Text style={[styles.pickerTabText, pickerMode === 'time' && styles.pickerTabTextActive]}>Chọn Giờ</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker
+                                        value={startDate}
+                                        mode={pickerMode}
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                        minimumDate={minDate}
+                                        textColor="#11181C"
+                                        themeVariant="light"
+                                        accentColor="#0D9488"
+                                        onChange={(event, date) => {
+                                            if (date) {
+                                                const newDate = new Date(startDate);
+                                                if (pickerMode === 'date') {
+                                                    newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                                                } else {
+                                                    newDate.setHours(date.getHours(), date.getMinutes());
+                                                }
+                                                setStartDate(newDate);
+                                                if (endDate < newDate) setEndDate(newDate);
+                                            }
+                                            if (Platform.OS === 'android' && pickerMode === 'time') setShowStartPicker(false);
+                                            if (Platform.OS === 'android' && pickerMode === 'date') setPickerMode('time');
+                                        }}
+                                    />
+                                    {Platform.OS === 'ios' && (
+                                        <TouchableOpacity style={styles.closePickerBtn} onPress={() => setShowStartPicker(false)}>
+                                            <Text style={styles.closePickerText}>Xong</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
                         </View>
 
-                        {/* HIỂN THỊ LỊCH INLINE NGAY BÊN DƯỚI NẾU BẤM VÀO NGÀY BẮT ĐẦU */}
-                        {showStartPicker && (
-                            <View style={styles.inlinePickerContainer}>
-                                <DateTimePicker
-                                    value={startDate}
-                                    mode="date"
-                                    display="inline"
-                                    minimumDate={minDate}
-                                    textColor="#11181C"
-                                    themeVariant="light"
-                                    accentColor="#0D9488"
-                                    onChange={(event, date) => {
-                                        if (date) {
-                                            setStartDate(date);
-                                            if (endDate < date) setEndDate(date);
-                                        }
-                                        if (Platform.OS === 'android') setShowStartPicker(false);
-                                    }}
-                                />
-                                {Platform.OS === 'ios' && (
-                                    <TouchableOpacity style={styles.closePickerBtn} onPress={() => setShowStartPicker(false)}>
-                                        <Text style={styles.closePickerText}>Xong</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        )}
+                        <View style={styles.timeBlock}>
+                            <Text style={styles.timeLabel}>Đến (Giờ & Ngày):</Text>
+                            <TouchableOpacity
+                                style={[styles.inputBox, showEndPicker && styles.inputBoxActive]}
+                                onPress={() => {
+                                    setPickerMode('date');
+                                    setShowEndPicker(!showEndPicker);
+                                    setShowStartPicker(false);
+                                }}
+                            >
+                                <Clock size={16} color={showEndPicker ? "#0D9488" : "#64748B"} />
+                                <Text style={[styles.inputText, showEndPicker && { color: "#0D9488", fontWeight: '700' }]}>
+                                    {formatDisplay(endDate)}
+                                </Text>
+                            </TouchableOpacity>
 
-                        {/* HIỂN THỊ LỊCH INLINE NGAY BÊN DƯỚI NẾU BẤM VÀO NGÀY KẾT THÚC */}
-                        {showEndPicker && (
-                            <View style={styles.inlinePickerContainer}>
-                                <DateTimePicker
-                                    value={endDate}
-                                    mode="date"
-                                    display="inline"
-                                    minimumDate={startDate}
-                                    textColor="#11181C"
-                                    themeVariant="light"
-                                    accentColor="#0D9488"
-                                    onChange={(event, date) => {
-                                        if (date) setEndDate(date);
-                                        if (Platform.OS === 'android') setShowEndPicker(false);
-                                    }}
-                                />
-                                {Platform.OS === 'ios' && (
-                                    <TouchableOpacity style={styles.closePickerBtn} onPress={() => setShowEndPicker(false)}>
-                                        <Text style={styles.closePickerText}>Xong</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        )}
+                            {/* HIỂN THỊ LỊCH INLINE KẾT THÚC */}
+                            {showEndPicker && (
+                                <View style={styles.inlinePickerContainer}>
+                                    <View style={styles.pickerTabs}>
+                                        <TouchableOpacity
+                                            style={[styles.pickerTab, pickerMode === 'date' && styles.pickerTabActive]}
+                                            onPress={() => setPickerMode('date')}
+                                        >
+                                            <Text style={[styles.pickerTabText, pickerMode === 'date' && styles.pickerTabTextActive]}>Chọn Ngày</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.pickerTab, pickerMode === 'time' && styles.pickerTabActive]}
+                                            onPress={() => setPickerMode('time')}
+                                        >
+                                            <Text style={[styles.pickerTabText, pickerMode === 'time' && styles.pickerTabTextActive]}>Chọn Giờ</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker
+                                        value={endDate}
+                                        mode={pickerMode}
+                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                        minimumDate={startDate}
+                                        textColor="#11181C"
+                                        themeVariant="light"
+                                        accentColor="#0D9488"
+                                        onChange={(event, date) => {
+                                            if (date) {
+                                                const newDate = new Date(endDate);
+                                                if (pickerMode === 'date') {
+                                                    newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                                                } else {
+                                                    newDate.setHours(date.getHours(), date.getMinutes());
+                                                }
+                                                setEndDate(newDate);
+                                            }
+                                            if (Platform.OS === 'android' && pickerMode === 'time') setShowEndPicker(false);
+                                            if (Platform.OS === 'android' && pickerMode === 'date') setPickerMode('time');
+                                        }}
+                                    />
+                                    {Platform.OS === 'ios' && (
+                                        <TouchableOpacity style={styles.closePickerBtn} onPress={() => setShowEndPicker(false)}>
+                                            <Text style={styles.closePickerText}>Xong</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+                        </View>
 
                         <TextInput style={styles.textArea} placeholder="Lý do chi tiết..." multiline value={reason} onChangeText={setReason} />
 
@@ -408,23 +480,29 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9'
     },
-    backButton: { padding: 5, marginLeft: -5 },
+    backButton: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center', marginLeft: -10 },
     headerTitle: { fontSize: 20, fontWeight: '900', color: '#0F172A', textAlign: 'center' },
     scrollContent: { padding: 15 },
     sectionCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     sectionTitle: { fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 15 },
     typeContainer: { flexDirection: 'row', gap: 8, marginBottom: 15 },
-    typeCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 10, borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'center' },
+    typeCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, height: 48, borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'center' },
     dot: { width: 6, height: 6, borderRadius: 3 },
     typeText: { fontSize: 11, color: '#64748B' },
-    row: { flexDirection: 'row', marginBottom: 10 },
-    ruleAlert: { fontSize: 11, color: '#F59E0B', fontStyle: 'italic', marginBottom: 8, fontWeight: '600', lineHeight: 16 },
-    inputBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-    inputText: { fontSize: 13, color: '#1E293B' },
 
-    // CSS MỚI CHO BẢNG CHỌN NGÀY INLINE
+    timeBlock: { marginBottom: 15 },
+    timeLabel: { fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 6 },
+    ruleAlert: { fontSize: 11, color: '#F59E0B', fontStyle: 'italic', marginBottom: 12, fontWeight: '600', lineHeight: 16 },
+    inputBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', padding: 16, height: 52, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+    inputText: { fontSize: 14, color: '#1E293B' },
+
     inputBoxActive: { borderColor: '#0D9488', backgroundColor: '#F0FDFA' },
-    inlinePickerContainer: { backgroundColor: '#FFF', borderRadius: 12, padding: 10, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
+    inlinePickerContainer: { backgroundColor: '#FFF', borderRadius: 12, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', width: '100%' },
+    pickerTabs: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 8, padding: 4, marginBottom: 10, width: '100%' },
+    pickerTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+    pickerTabActive: { backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+    pickerTabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+    pickerTabTextActive: { color: '#0D9488' },
     closePickerBtn: { marginTop: 5, paddingVertical: 8, paddingHorizontal: 20, backgroundColor: '#F0FDFA', borderRadius: 8, alignSelf: 'flex-end' },
     closePickerText: { color: '#0D9488', fontWeight: '700', fontSize: 14 },
 
@@ -433,9 +511,9 @@ const styles = StyleSheet.create({
     evidenceTitle: { fontSize: 13, fontWeight: '700', color: '#334155' },
     evidenceHint: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
     imageActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: 12, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed' },
-    smallUploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    smallUploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, justifyContent: 'center' },
     smallUploadText: { fontSize: 13, fontWeight: '600', color: '#0D9488' },
-    submitBtn: { backgroundColor: '#0F172A', padding: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+    submitBtn: { backgroundColor: '#0F172A', height: 60, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
     submitBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
 
     historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },

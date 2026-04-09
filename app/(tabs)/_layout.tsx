@@ -11,13 +11,12 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false, // Ẩn header mặc định
-        tabBarActiveTintColor: '#6345E5',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarActiveTintColor: '#FFFFFF', // ⚪️ Đổi sang màu trắng tinh cho nút đang chọn
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)', // ⚪️ Màu trắng mờ cho nút chưa chọn
 
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#F1F5F9',
+          backgroundColor: '#6345E5', // 🟣 Đổi nền sang màu tím chủ đạo
+          borderTopWidth: 0, // Xoá viền xám bên trên cho mượt
 
           // ✅ 3. TỰ ĐỘNG TÍNH TOÁN CHIỀU CAO & PADDING
           // Chiều cao cơ bản của Tab (icon + chữ) là khoảng 60.

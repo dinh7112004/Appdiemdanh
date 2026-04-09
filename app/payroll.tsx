@@ -220,9 +220,9 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
         backgroundColor: '#F8FAFC',
     },
-    iconBtn: { width: 40, height: 40, justifyContent: 'center' },
+    iconBtn: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center' },
     monthSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 25, paddingHorizontal: 5, paddingVertical: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
-    monthArrow: { padding: 8, backgroundColor: '#F1F5F9', borderRadius: 20 },
+    monthArrow: { width: 48, height: 48, backgroundColor: '#F1F5F9', borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginHorizontal: 15 },
 
     content: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 10 },

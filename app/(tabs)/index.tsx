@@ -4,17 +4,46 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getDistance } from 'geolib';
-import { AlertCircle, Bell, CheckCircle2, ChevronRight, Clock, History, LogIn, LogOut, MapPin, MessageSquare, UserCircle } from 'lucide-react-native';
+import {
+  Activity,
+  Bell,
+  Briefcase,
+  Calendar,
+  CircleDollarSign,
+  ClipboardList,
+  Clock,
+  Headset,
+  MapPin,
+  UserCircle
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Modal, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE } from '../../constants/Config';
+
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 60) / 2;
 
 interface UserInfo {
   id?: string;
   _id?: string;
   name: string;
+  position?: string;
+  dept?: string;
 }
 
 export default function HomeScreen() {
@@ -28,17 +57,21 @@ export default function HomeScreen() {
   const [currentUser, setCurrentUser] = useState<UserInfo>({ id: "", name: "Nhân viên" });
   const [officeConfig, setOfficeConfig] = useState({ latitude: 20.9965, longitude: 105.7398, radius: 100 });
   const [todayLogs, setTodayLogs] = useState<any[]>([]);
+  const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [isLeaveToday, setIsLeaveToday] = useState(false);
 
-  // States cho Form Xin phép
+  const [stats, setStats] = useState({
+    monthlyAttendance: '0/0',
+    todayHours: '0h 00m',
+    leaveRemaining: '0',
+    status: 'Ngoại tuyến'
+  });
+
   const [modalVisible, setModalVisible] = useState(false);
   const [reason, setReason] = useState('');
   const [actionType, setActionType] = useState('');
-
-  // State cho Popup Chi tiết lịch sử
   const [selectedLog, setSelectedLog] = useState<any>(null);
-
-
+  const [selectedStat, setSelectedStat] = useState<{ title: string, detail: string } | null>(null);
 
   const fetchUnreadCount = async (userId: string) => {
     if (!userId || userId === "ADMIN_ID" || userId.length < 5) return;
@@ -48,17 +81,60 @@ export default function HomeScreen() {
     } catch (err: any) { console.log("Lỗi fetch thông báo:", err.message); }
   };
 
+  const calculateStats = (allAttendance: any[], userId: string) => {
+    const today = new Date();
+    const month = today.getMonth();
+    const year = today.getFullYear();
+    const todayStr = today.toLocaleDateString('vi-VN');
+
+    const monthlyLogs = allAttendance.filter(item => {
+      const d = new Date(item.createdAt);
+      const uid = item.userId?._id ? String(item.userId._id) : String(item.userId);
+      return d.getMonth() === month && d.getFullYear() === year && uid === userId;
+    });
+
+    const uniqueDays = new Set(monthlyLogs.map(l => new Date(l.createdAt).toLocaleDateString('vi-VN'))).size;
+    const workingDays = new Date(year, month + 1, 0).getDate();
+
+    const todayLogsForUser = monthlyLogs.filter(l => new Date(l.createdAt).toLocaleDateString('vi-VN') === todayStr);
+    let totalMs = 0;
+    todayLogsForUser.forEach(log => {
+      if (log.checkInTime && log.checkOutTime) {
+        totalMs += new Date(log.checkOutTime).getTime() - new Date(log.checkInTime).getTime();
+      } else if (log.checkInTime && !log.checkOutTime) {
+        totalMs += today.getTime() - new Date(log.checkInTime).getTime();
+      }
+    });
+
+    const hours = Math.floor(totalMs / 3600000);
+    const mins = Math.floor((totalMs % 3600000) / 60000);
+
+    setStats(prev => ({
+      ...prev,
+      monthlyAttendance: `${uniqueDays}/${workingDays}`,
+      todayHours: `${hours}h ${mins}p`,
+      status: todayLogsForUser.some(l => !l.checkOutTime) ? 'Đang làm' : 'Đang nghỉ'
+    }));
+  };
+
   const fetchOnlyData = async (user = currentUser) => {
     try {
       const userIdToFilter = user?._id || user?.id;
       if (!userIdToFilter || userIdToFilter === "ADMIN_ID") return;
       const res = await axios.get(`${API_BASE}/attendance`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
-      const todayStr = new Date().toLocaleDateString('vi-VN');
-      const myLogs = res.data.filter((item: any) => {
+      calculateStats(res.data, String(userIdToFilter));
+
+      const myAllLogs = res.data.filter((item: any) => {
         const recordUserId = item.userId?._id ? String(item.userId._id) : String(item.userId);
-        return recordUserId === String(userIdToFilter) && new Date(item.createdAt).toLocaleDateString('vi-VN') === todayStr;
+        return recordUserId === String(userIdToFilter);
       });
+
+      const todayStr = new Date().toLocaleDateString('vi-VN');
+      const myLogs = myAllLogs.filter((item: any) => new Date(item.createdAt).toLocaleDateString('vi-VN') === todayStr);
       setTodayLogs(myLogs.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+
+      const sortedDesc = [...myAllLogs].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setRecentLogs(sortedDesc.slice(0, 6));
     } catch (error: any) { console.log("Lỗi fetch dữ liệu:", error.message); }
   };
 
@@ -68,13 +144,13 @@ export default function HomeScreen() {
       const todayStr = new Date().toLocaleDateString('vi-VN');
       const hasApprovedLeave = res.data.some((leave: any) => leave.status === 'APPROVED' && leave.startDate === todayStr);
       setIsLeaveToday(hasApprovedLeave);
+      setStats(prev => ({ ...prev, leaveRemaining: '12' }));
     } catch (error: any) { console.log("Lỗi fetch phép:", error.message); }
   };
 
   const checkStatus = async () => {
     try {
       setLoading(true);
-      // 1. Lấy user từ máy trước (Nhanh)
       const userData = await AsyncStorage.getItem('currentUser');
       let parsedUser = currentUser;
       if (userData) {
@@ -84,7 +160,6 @@ export default function HomeScreen() {
 
       const realUserId = parsedUser._id || parsedUser.id;
 
-      // 2. Gọi API lấy data trước (Không đợi Location)
       const [configRes] = await Promise.all([
         axios.get(`${API_BASE}/config`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
         realUserId ? fetchOnlyData(parsedUser) : Promise.resolve(),
@@ -94,20 +169,16 @@ export default function HomeScreen() {
 
       if (configRes?.data) setOfficeConfig(configRes.data);
 
-      // 3. Cuối cùng mới lấy tọa độ (Android rất kỵ việc này chạy chung với API)
       setTimeout(async () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          // Dùng Balanced nhưng giới thiệu thêm timeout cho tọa độ
-          let location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
+          let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           setDistance(getDistance(
             { latitude: location.coords.latitude, longitude: location.coords.longitude },
             { latitude: configRes.data.latitude, longitude: configRes.data.longitude }
           ));
         }
-      }, 500); // Delay 0.5s để API load xong đã
+      }, 500);
 
     } catch (err: any) {
       console.log("Lỗi checkStatus:", err.message);
@@ -171,199 +242,302 @@ export default function HomeScreen() {
     } catch (e: any) { Alert.alert("Lỗi", e.response?.data?.message || "Lỗi kết nối Server"); } finally { setLoading(false); }
   };
 
+  const StatCard = ({ title, value, sub, icon: Icon, color, onPress }: any) => (
+    <TouchableOpacity style={styles.statCard} activeOpacity={0.7} onPress={onPress}>
+      <View style={styles.statCardHeader}>
+        <Text style={styles.statCardTitle}>{title}</Text>
+        <View style={[styles.statIconBox, { backgroundColor: `${color}15` }]}>
+          <Icon size={18} color={color} />
+        </View>
+      </View>
+      <Text style={styles.statCardValue}>{value}</Text>
+      <Text style={styles.statCardSub}>{sub}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* HEADER TỪ BẢN THIẾT KẾ MỚI */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top + 10 }]}>
-        <View style={styles.header}>
-          <View style={styles.userSection}>
-            <View style={styles.avatarShadow}>
-              <UserCircle size={46} color="#FFF" />
+      {/* WHITE TOP BAR */}
+      <View style={[styles.whiteTopBar, { paddingTop: insets.top }]}>
+        <View style={styles.topRowInner}>
+          <View style={styles.brand}>
+            <Image source={require('../../assets/images/icon.png')} style={{ width: 28, height: 28, borderRadius: 6 }} />
+            <Text style={styles.brandTitleDark}>HRM PRO</Text>
+          </View>
+          <TouchableOpacity style={styles.notifBtnLight} onPress={() => router.push('/notifications')}>
+            <Bell size={22} color="#6345E5" />
+            {unreadCount > 0 && <View style={styles.unreadDot} />}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* GRADIENT HEADER */}
+      <View style={styles.headerWrapper}>
+        <LinearGradient
+          colors={['#6345E5', '#3F2B96']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          {/* USER INFO */}
+          <View style={styles.userRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>Xin chào 👋</Text>
+              <Text style={styles.userNameHeader}>{currentUser.name || "Nhân viên"}</Text>
+              <View style={styles.locBadge}>
+                <MapPin size={12} color="#FFF" />
+                <Text style={styles.locText}>Khu vực: {isStrictlyAtOffice ? "Văn phòng" : "Từ xa"}</Text>
+              </View>
             </View>
-            <View style={{ marginLeft: 14 }}>
-              <Text style={styles.welcomeText}>Xin chào,</Text>
-              <Text style={styles.userName}>{currentUser.name}</Text>
-            </View>
+            <TouchableOpacity style={styles.avatarBig} onPress={() => router.push('/(tabs)/profile')}>
+              <UserCircle size={48} color="rgba(255,255,255,1)" />
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.refreshCircle} onPress={() => router.push('/notifications')}>
-            <Bell size={22} color="#FFF" />
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+          {/* PRIMARY ATTENDANCE CARD */}
+          <View style={styles.attendanceBox}>
+            <View style={[styles.attendanceInfo, (isMaxTurnsReached || isLeaveToday) && { alignItems: 'center' }]}>
+              <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6 }, (isMaxTurnsReached || isLeaveToday) && { justifyContent: 'center' }]}>
+                <Clock size={16} color="#8B8B9B" />
+                <Text style={[styles.attendanceLabel, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center' }]}>
+                  {isLeaveToday ? "ĐANG NGHỈ PHÉP" : (isMaxTurnsReached ? "ĐÃ HOÀN THÀNH ĐIỂM DANH" : "ĐIỂM DANH HÔM NAY")}
+                </Text>
               </View>
+              <Text style={[styles.attendanceTimeText, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center', marginTop: 10 }]}>{currentTime}</Text>
+              <Text style={[styles.attendanceDateText, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center' }]}>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}</Text>
+            </View>
+            {!(isMaxTurnsReached || isLeaveToday) && (
+              <>
+                <View style={styles.vDivider} />
+                <View style={styles.attendanceBtnWrapper}>
+                  <TouchableOpacity
+                    style={[styles.checkBtn, ongoingSession && styles.checkBtnActive]}
+                    onPress={() => ongoingSession ? handlePress('RA') : handlePress('VÀO')}
+                    disabled={loading}
+                  >
+                    {loading ? <ActivityIndicator size="small" color="#6345E5" /> : (
+                      <Text style={[styles.checkBtnText, ongoingSession && { color: '#EF4444' }]}>
+                        {ongoingSession ? "RA CA" : "VÀO CA"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
+          </View>
+        </LinearGradient>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
+
+        {/* STATS GRID */}
+        <View style={styles.statsLayout}>
+          <StatCard
+            title="Đ.danh tháng"
+            value={stats.monthlyAttendance}
+            sub="Xem chi tiết"
+            icon={Calendar}
+            color="#6345E5"
+            onPress={() => router.push('/history')}
+          />
+          <StatCard
+            title="Giờ hôm nay"
+            value={stats.todayHours}
+            sub="Xem lịch sử"
+            icon={Clock}
+            color="#10B981"
+            onPress={() => router.push('/history')}
+          />
+          <StatCard
+            title="Phép còn lại"
+            value={stats.leaveRemaining}
+            sub="Tạo đơn mới"
+            icon={Briefcase}
+            color="#F59E0B"
+            onPress={() => router.push('/leave-request')}
+          />
+          <StatCard
+            title="Khoảng cách"
+            value={distance > 1000 ? `${(distance / 1000).toFixed(1)}km` : `${distance}m`}
+            sub="Độ chính xác cao"
+            icon={MapPin}
+            color="#EF4444"
+            onPress={() => setSelectedStat({ title: "Định vị GPS", detail: `Bạn đang ở cách văn phòng khoảng ${distance}m. ${isStrictlyAtOffice ? 'Đủ điều kiện điểm danh.' : 'Vui lòng ghi rõ lý do nếu điểm danh từ xa.'}` })}
+          />
+        </View>
+
+        {/* QUICK SHORTCUTS */}
+        <Text style={styles.sectionHeader}>Tiện ích nhanh</Text>
+        <View style={styles.shortcutRow}>
+          {[
+            { icon: ClipboardList, label: "Xin nghỉ", color: "#10B981", route: "/leave-request" },
+            { icon: CircleDollarSign, label: "Bảng lương", color: "#6345E5", route: "/payroll" },
+            { icon: Activity, label: "Nhiệm vụ", color: "#F59E0B", route: "/tasks" },
+            { icon: Headset, label: "Hỗ trợ", color: "#4338CA", route: "/chat" },
+          ].map((item, idx) => (
+            <TouchableOpacity key={idx} style={styles.shortcutItem} onPress={() => router.push(item.route as any)}>
+              <View style={[styles.shortcutIcon, { backgroundColor: `${item.color}15` }]}>
+                <item.icon size={24} color={item.color} />
+              </View>
+              <Text style={styles.shortcutLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* RECENT HISTORY */}
+        <View style={styles.historyHeaderRow}>
+          <Text style={styles.sectionHeader}>Hoạt động gần đây</Text>
+          <TouchableOpacity onPress={() => router.push('/history')}>
+            <Text style={styles.seeMore}>Tất cả</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.clockCardWrapper}>
-          <LinearGradient colors={['#9A83F5', '#6345E5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.clockCard}>
-            <View style={styles.clockHeader}>
-              <Clock color="rgba(255,255,255,0.8)" size={16} />
-              <Text style={styles.dateLabel}>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-            </View>
-            <Text style={styles.bigTime}>{currentTime}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: isStrictlyAtOffice ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
-              <MapPin size={14} color="#FFF" />
-              <Text style={styles.statusText}>
-                {isStrictlyAtOffice ? "Tại văn phòng" : `Ngoài văn phòng `}
-              </Text>
-            </View>
-          </LinearGradient>
+        <View style={styles.recentList}>
+          {recentLogs.length === 0 ? (
+            <View style={styles.emptyCard}><Text style={styles.emptyMsg}>Chưa có dữ liệu hoạt động</Text></View>
+          ) : recentLogs.map((log, index) => {
+            const rawType = String(log.type || log.locationType || "").toUpperCase().trim();
+            const isOffice = rawType === 'OFFICE';
+
+            let totalHoursText = "0p";
+            if (log.checkInTime && log.checkOutTime) {
+              const inTime = new Date(log.checkInTime).getTime();
+              const outTime = new Date(log.checkOutTime).getTime();
+              const diffMs = outTime - inTime;
+              const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+              const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+              if (diffHours > 0) {
+                totalHoursText = `${diffHours}h ${diffMinutes}p`;
+              } else {
+                totalHoursText = `${diffMinutes}p`;
+              }
+            }
+
+            const dateObj = new Date(log.createdAt);
+            const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+
+            let timeStr = "Đang làm...";
+            if (log.checkInTime) {
+              const inTime = new Date(log.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+              if (log.checkOutTime) {
+                const outTime = new Date(log.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                timeStr = `${inTime} - ${outTime}`;
+              } else {
+                timeStr = `${inTime} - ...`;
+              }
+            }
+
+            const isHighlight = index === 0;
+
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.logRow,
+                  index === 0 && styles.firstRow,
+                  index === recentLogs.length - 1 && styles.lastRow,
+                  recentLogs.length === 1 && styles.singleRow
+                ]}
+                onPress={() => setSelectedLog(log)}
+              >
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text style={{
+                    fontSize: 15,
+                    fontWeight: '600',
+                    color: isHighlight ? '#0056D2' : '#1E293B'
+                  }}>
+                    {dateObj.getDate().toString().padStart(2, '0')}/{(dateObj.getMonth() + 1).toString().padStart(2, '0')} {isOffice ? '(VP)' : '(Ngoài VP)'}:{"  "}
+                  </Text>
+                  <Text style={{
+                    fontSize: 15,
+                    fontWeight: '500',
+                    color: '#64748B'
+                  }}>
+                    {timeStr}
+                  </Text>
+                </View>
+                <View style={styles.logValueWrap}>
+                  <Text style={{
+                    fontSize: 15,
+                    fontWeight: '800',
+                    color: isHighlight ? '#0056D2' : '#1E293B'
+                  }}>
+                    {totalHoursText}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </View>
 
-      <View style={styles.mainContent}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <View style={{ height: 40 }} />
+      </ScrollView>
 
-          {/* NÚT BẤM CA LÀM MƯỢT MÀ */}
-          <View style={styles.grid}>
-            <TouchableOpacity
-              style={[styles.mainBtn, (ongoingSession || isMaxTurnsReached || isLeaveToday) && styles.btnDisabled]}
-              onPress={() => handlePress('VÀO')}
-              disabled={loading || !!ongoingSession || isMaxTurnsReached || isLeaveToday}
-            >
-              <LinearGradient colors={ongoingSession || isMaxTurnsReached || isLeaveToday ? ['#F5F5FA', '#EAEAF2'] : ['#9A83F5', '#6345E5']} style={styles.btnGradient}>
-                {loading && actionType === 'VÀO' ? <ActivityIndicator color="#6345E5" /> : <LogIn color={ongoingSession || isMaxTurnsReached || isLeaveToday ? "#A0A0B5" : "#fff"} size={32} />}
-                <Text style={[styles.btnText, (ongoingSession || isMaxTurnsReached || isLeaveToday) && { color: '#A0A0B5' }]}>
-                  {isLeaveToday ? 'ĐANG NGHỈ PHÉP' : 'VÀO CA'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.mainBtn, !ongoingSession && styles.btnDisabled]}
-              onPress={() => handlePress('RA')}
-              disabled={loading || !ongoingSession}
-            >
-              <LinearGradient colors={!ongoingSession ? ['#F5F5FA', '#EAEAF2'] : ['#9A83F5', '#6345E5']} style={styles.btnGradient}>
-                {loading && actionType === 'RA' ? <ActivityIndicator color="#6345E5" /> : <LogOut color={!ongoingSession ? "#A0A0B5" : "#fff"} size={32} />}
-                <Text style={[styles.btnText, !ongoingSession && { color: '#A0A0B5' }]}>RA CA</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {/* BOX LỊCH SỬ CHẤM CÔNG CÓ THỂ BẤM VÀO */}
-          <View style={styles.historyBox}>
-            <View style={styles.historyHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <History size={20} color="#2A2640" />
-                <Text style={styles.historyTitle}>Lịch sử điểm danh</Text>
-              </View>
-              <Text style={styles.historySubtitle}>{todayLogs.length}/2 lượt</Text>
-            </View>
-
-            {todayLogs.length === 0 ? (
-              <View style={styles.emptyState}><Text style={styles.emptyText}>Bạn chưa điểm danh hôm nay</Text></View>
-            ) : (
-              todayLogs.map((log, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.logItem}
-                  activeOpacity={0.7}
-                  onPress={() => setSelectedLog(log)} // MỞ CHI TIẾT
-                >
-                  <View style={[styles.logIndicator, { backgroundColor: log.status === 'APPROVED' ? '#6345E5' : '#F59E0B' }]} />
-                  <View style={{ flex: 1, paddingLeft: 14 }}>
-                    <Text style={styles.logTime}>
-                      {new Date(log.checkInTime || log.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                      {' - '}
-                      {log.checkOutTime ? new Date(log.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Đang làm...'}
-                    </Text>
-                    <Text style={styles.logNote} numberOfLines={1}>{log.note || 'Tại văn phòng'}</Text>
-                  </View>
-                  <View style={styles.logActionWrap}>
-                    <View style={[styles.statusPill, { backgroundColor: log.status === 'APPROVED' ? '#F0EDFD' : 'rgba(245, 158, 11, 0.1)' }]}>
-                      <Text style={[styles.statusPillText, { color: log.status === 'APPROVED' ? '#6345E5' : '#D97706' }]}>
-                        {log.status === 'APPROVED' ? 'Xong' : 'Chờ'}
-                      </Text>
-                    </View>
-                    <ChevronRight size={16} color="#C1C1D6" style={{ marginLeft: 4 }} />
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        </ScrollView>
-      </View>
-
-      {/* --------------------------------------------------------- */}
-      {/* POPUP CHI TIẾT LỊCH SỬ (XEM LỜI NHẮN) */}
-      {/* --------------------------------------------------------- */}
-      <Modal visible={!!selectedLog} transparent animationType="slide" onRequestClose={() => setSelectedLog(null)}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedLog(null)} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeaderIndicator} />
-            <Text style={styles.modalTitle}>Chi tiết điểm danh</Text>
-
-            {selectedLog && (
-              <View style={styles.detailBody}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Thời gian:</Text>
-                  <Text style={styles.detailValueBig}>
-                    {new Date(selectedLog.checkInTime || selectedLog.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                    {' - '}
-                    {selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Đang làm...'}
-                  </Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Trạng thái:</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    {selectedLog.status === 'APPROVED' ? <CheckCircle2 size={16} color="#10B981" /> : <AlertCircle size={16} color="#F59E0B" />}
-                    <Text style={[styles.detailValue, { color: selectedLog.status === 'APPROVED' ? '#10B981' : '#F59E0B', marginLeft: 4, fontWeight: '700' }]}>
-                      {selectedLog.status === 'APPROVED' ? 'Đã duyệt' : 'Đang chờ duyệt'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.divider} />
-
-                {/* Phần Lý do của nhân viên */}
-                <Text style={styles.detailSubtitle}>Lời nhắn của bạn:</Text>
-                <View style={styles.noteBox}>
-                  <Text style={styles.noteText}>{selectedLog.note || "Không có lời nhắn"}</Text>
-                </View>
-
-                {/* Phần Lời nhắn của Sếp (adminNote hoặc managerNote) */}
-                <Text style={[styles.detailSubtitle, { marginTop: 20 }]}>Phản hồi từ quản lý:</Text>
-                <View style={[styles.noteBox, { backgroundColor: '#F0EDFD', borderColor: '#E0D8FA' }]}>
-                  <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                    <MessageSquare size={14} color="#6345E5" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#6345E5', marginLeft: 6 }}>Sếp nhắn:</Text>
-                  </View>
-                  <Text style={[styles.noteText, { color: '#2A2640' }]}>
-                    {selectedLog.adminReply || selectedLog.adminNote || selectedLog.managerNote || "Quản lý chưa để lại phản hồi."}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity onPress={() => setSelectedLog(null)} style={[styles.cancelBtn, { marginTop: 24 }]}>
-              <Text style={styles.cancelText}>Đóng</Text>
+      {/* STAT MODAL */}
+      <Modal visible={!!selectedStat} transparent animationType="fade" onRequestClose={() => setSelectedStat(null)}>
+        <View style={styles.overlayCenter}>
+          <View style={styles.popupBox}>
+            <Text style={styles.popupTitle}>{selectedStat?.title}</Text>
+            <Text style={styles.popupBody}>{selectedStat?.detail}</Text>
+            <TouchableOpacity onPress={() => setSelectedStat(null)} style={styles.popupClose}>
+              <Text style={styles.popupCloseText}>Đóng</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* POPUP XIN LÀM TỪ XA CŨ */}
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeaderIndicator} />
-            <Text style={styles.modalTitle}>Làm việc từ xa</Text>
-            <Text style={styles.modalSub}>Vui lòng cung cấp lý do để quản lý phê duyệt.</Text>
-            <TextInput style={styles.modalInput} multiline value={reason} onChangeText={setReason} placeholder="Ví dụ: Đi gặp khách hàng..." />
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => { setModalVisible(false); setLoading(false); }} style={styles.cancelBtn}><Text style={styles.cancelText}>Hủy</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => { setLoading(true); submitAttendance(actionType, 'REMOTE', reason, 'PENDING', distance); }} style={styles.confirmBtn}>
-                <LinearGradient colors={['#9A83F5', '#6345E5']} style={styles.confirmGradient}><Text style={styles.confirmText}>Gửi yêu cầu</Text></LinearGradient>
-              </TouchableOpacity>
-            </View>
+      {/* REMAINDING MODALS (CLEANED UP) */}
+      <Modal visible={!!selectedLog} transparent animationType="slide" onRequestClose={() => setSelectedLog(null)}>
+        <View style={styles.overlayBottom}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setSelectedLog(null)} />
+          <View style={styles.popupSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Chi tiết điểm danh</Text>
+            {selectedLog && (
+              <View style={{ marginTop: 20 }}>
+                <View style={styles.detailItem}><Text style={styles.dL}>Thời gian:</Text><Text style={styles.dV}>{new Date(selectedLog.checkInTime || selectedLog.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {selectedLog.checkOutTime ? new Date(selectedLog.checkOutTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '...'}</Text></View>
+                <View style={styles.detailItem}><Text style={styles.dL}>Trạng thái:</Text><Text style={[styles.dV, { color: selectedLog.status === 'APPROVED' ? '#10B981' : '#F59E0B' }]}>{selectedLog.status === 'APPROVED' ? 'Đã duyệt' : 'Chờ duyệt'}</Text></View>
+                <View style={styles.hLine} />
+                <Text style={styles.detailSub}>Lời nhắn của bạn:</Text>
+                <View style={styles.noteCard}><Text style={styles.noteT}>{selectedLog.note || "Hệ thống tự động"}</Text></View>
+              </View>
+            )}
+            <TouchableOpacity onPress={() => setSelectedLog(null)} style={styles.fullBtn}><Text style={styles.fullBtnT}>Đóng</Text></TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.overlayBottom}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setModalVisible(false)} />
+          <KeyboardAvoidingView behavior="padding">
+            <View style={styles.popupSheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>Làm việc từ xa</Text>
+              <Text style={styles.sheetDesc}>Bạn đang ở ngoài văn phòng. Hãy ghi chú lý do của bạn bên dưới:</Text>
+              <TextInput
+                style={styles.sheetInput}
+                multiline
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Lý do đi công tác, gặp đối tác..."
+                placeholderTextColor="#A0A0B5"
+              />
+              <View style={styles.sheetActions}>
+                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.sBtn}><Text style={styles.sBtnT}>Bỏ qua</Text></TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => submitAttendance(actionType, 'REMOTE', reason, 'PENDING', distance)}
+                  style={styles.pBtn}
+                  disabled={!reason.trim()}
+                >
+                  <Text style={styles.pBtnT}>Gửi yêu cầu</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -371,66 +545,116 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F4FA' },
-  headerContainer: { backgroundColor: '#6345E5', paddingBottom: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 20 },
-  userSection: { flexDirection: 'row', alignItems: 'center' },
-  avatarShadow: { padding: 3, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 50 },
-  welcomeText: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  userName: { fontSize: 20, fontWeight: '800', color: '#fff', marginTop: 2 },
-  refreshCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  badge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#EF4444', minWidth: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#6345E5' },
-  badgeText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
-  clockCardWrapper: { paddingHorizontal: 24 },
-  clockCard: { borderRadius: 30, padding: 30, elevation: 15, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 15 },
-  clockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  dateLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginLeft: 8, fontWeight: '600' },
-  bigTime: { fontSize: 60, fontWeight: '900', color: '#fff', textAlign: 'center', letterSpacing: 2 },
-  statusBadge: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 30, marginTop: 18 },
-  statusText: { fontSize: 12, fontWeight: '700', marginLeft: 6, color: '#fff' },
-  mainContent: { flex: 1, backgroundColor: '#F4F4FA', borderTopLeftRadius: 40, borderTopRightRadius: 40, marginTop: -40 },
-  scrollContent: { paddingHorizontal: 24, paddingTop: 35, paddingBottom: 100 },
-  grid: { flexDirection: 'row', gap: 16, marginBottom: 30 },
-  mainBtn: { flex: 1, height: 140, borderRadius: 32, overflow: 'hidden', elevation: 8, shadowColor: '#6345E5', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  btnGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  btnDisabled: { elevation: 0, shadowOpacity: 0 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 12 },
-  historyBox: { backgroundColor: '#fff', borderRadius: 30, padding: 24, elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
-  historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  historyTitle: { fontSize: 17, fontWeight: '800', color: '#2A2640', marginLeft: 10 },
-  historySubtitle: { fontSize: 13, color: '#8B8B9B', fontWeight: '600' },
-  emptyState: { paddingVertical: 20, alignItems: 'center' },
-  emptyText: { color: '#A0A0B5', fontSize: 14 },
-  logItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 18, backgroundColor: '#F9F9FC', padding: 14, borderRadius: 20, borderWidth: 1, borderColor: '#F0F0F5' },
-  logIndicator: { width: 4, height: 35, borderRadius: 4 },
-  logTime: { fontSize: 16, fontWeight: '800', color: '#2A2640' },
-  logNote: { fontSize: 13, color: '#8B8B9B', marginTop: 6 },
-  logActionWrap: { flexDirection: 'row', alignItems: 'center' },
-  statusPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  statusPillText: { fontSize: 11, fontWeight: '800' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  whiteTopBar: { backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  topRowInner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 50 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandTitleDark: { color: '#1E293B', fontSize: 18, fontWeight: '900' },
+  notifBtnLight: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' },
+  headerWrapper: { backgroundColor: '#6345E5', borderBottomLeftRadius: 36, borderBottomRightRadius: 36, overflow: 'hidden' },
+  headerGradient: { paddingHorizontal: 20, paddingBottom: 30, paddingTop: 10 },
+  unreadDot: { position: 'absolute', top: 12, right: 12, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#FFF' },
 
-  /* MODAL STYLES CHUNG */
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 15, 30, 0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 30, paddingBottom: 45 },
-  modalHeaderIndicator: { width: 50, height: 5, backgroundColor: '#EAEAF2', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: '#2A2640', textAlign: 'center' },
-  modalSub: { fontSize: 14, color: '#8B8B9B', textAlign: 'center', marginTop: 12, marginBottom: 24 },
-  modalInput: { backgroundColor: '#F9F9FC', borderRadius: 18, padding: 20, height: 120, textAlignVertical: 'top', borderWidth: 1, borderColor: '#EAEAF2', fontSize: 15 },
-  modalActions: { flexDirection: 'row', gap: 16, marginTop: 28 },
-  cancelBtn: { flex: 1, paddingVertical: 18, alignItems: 'center', borderRadius: 20, backgroundColor: '#F4F4FA' },
-  cancelText: { fontWeight: '700', color: '#8B8B9B', fontSize: 15 },
-  confirmBtn: { flex: 2, borderRadius: 20, overflow: 'hidden' },
-  confirmGradient: { paddingVertical: 18, alignItems: 'center' },
-  confirmText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  userRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 25 },
+  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '500' },
+  userNameHeader: { color: '#FFF', fontSize: 24, fontWeight: '900', marginTop: 4 },
+  locBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start', marginTop: 8, gap: 4 },
+  locText: { color: '#FFF', fontSize: 11, fontWeight: '600' },
+  avatarBig: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  avatarImg: { width: '100%', height: '100%' },
 
-  /* STYLE CHO MODAL CHI TIẾT */
-  detailBody: { marginTop: 25 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  detailLabel: { fontSize: 14, color: '#8B8B9B', fontWeight: '600' },
-  detailValueBig: { fontSize: 17, color: '#2A2640', fontWeight: '800' },
-  detailValue: { fontSize: 14, color: '#2A2640', fontWeight: '700' },
-  divider: { height: 1, backgroundColor: '#F0F0F5', marginVertical: 16 },
-  detailSubtitle: { fontSize: 13, color: '#8B8B9B', fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
-  noteBox: { backgroundColor: '#F9F9FC', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#F0F0F5' },
-  noteText: { fontSize: 14, color: '#4A465B', lineHeight: 22 },
+  attendanceBox: { backgroundColor: '#FFF', borderRadius: 28, padding: 22, flexDirection: 'row', alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10 },
+  attendanceInfo: { flex: 1 },
+  attendanceLabel: { color: '#8B8B9B', fontSize: 11, fontWeight: '800' },
+  attendanceTimeText: { color: '#2A2640', fontSize: 32, fontWeight: '900' },
+  attendanceDateText: { color: '#8B8B9B', fontSize: 13, marginTop: 2 },
+  vDivider: { width: 1, height: 50, backgroundColor: '#F1F5F9', marginHorizontal: 15 },
+  attendanceBtnWrapper: { alignItems: 'center' },
+  checkBtn: { paddingHorizontal: 18, height: 44, borderRadius: 15, borderWidth: 1.5, borderColor: '#6345E5', justifyContent: 'center' },
+  checkBtnActive: { borderColor: '#EF4444' },
+  checkBtnDisabled: { borderColor: '#EAEAF2' },
+  checkBtnText: { color: '#6345E5', fontWeight: '900', fontSize: 13 },
+
+  scrollBody: { paddingHorizontal: 20, paddingTop: 25 },
+  statsLayout: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 25 },
+  statCard: { width: CARD_WIDTH, backgroundColor: '#FFF', borderRadius: 24, padding: 18, elevation: 2, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10 },
+  statCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  statCardTitle: { fontSize: 12, color: '#8B8B9B', fontWeight: '600' },
+  statIconBox: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  statCardValue: { fontSize: 18, fontWeight: '900', color: '#2A2640' },
+  statCardSub: { fontSize: 11, color: '#10B981', fontWeight: '700', marginTop: 4 },
+
+  sectionHeader: { fontSize: 17, fontWeight: '800', color: '#2A2640', marginBottom: 15 },
+  shortcutRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
+  shortcutItem: { alignItems: 'center', gap: 8 },
+  shortcutIcon: { width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  shortcutLabel: { fontSize: 12, fontWeight: '700', color: '#4A4A65' },
+
+  historyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  seeMore: { color: '#6345E5', fontWeight: '700', fontSize: 13 },
+  recentList: { marginTop: 10 },
+
+  logRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  firstRow: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: 1,
+  },
+  lastRow: {
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomWidth: 1,
+  },
+  singleRow: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderRadius: 16,
+  },
+  logValueWrap: {
+    marginLeft: 10,
+  },
+
+  emptyCard: { padding: 40, alignItems: 'center' },
+  emptyMsg: { color: '#C1C1D6', fontSize: 13 },
+
+  overlayBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  overlayCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 30 },
+  popupBox: { backgroundColor: '#FFF', borderRadius: 24, padding: 25, width: '100%' },
+  popupTitle: { fontSize: 18, fontWeight: '900', color: '#2A2640', marginBottom: 10 },
+  popupBody: { fontSize: 14, color: '#4A4A65', lineHeight: 20, marginBottom: 20 },
+  popupClose: { backgroundColor: '#F1F5F9', paddingVertical: 12, borderRadius: 15, alignItems: 'center' },
+  popupCloseText: { color: '#6345E5', fontWeight: '700' },
+
+  popupSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 },
+  sheetHandle: { width: 40, height: 5, backgroundColor: '#EAEAF2', borderRadius: 4, alignSelf: 'center', marginBottom: 20 },
+  sheetTitle: { fontSize: 20, fontWeight: '900', color: '#2A2640' },
+  sheetDesc: { fontSize: 14, color: '#8B8B9B', marginTop: 10, marginBottom: 20 },
+  sheetInput: { backgroundColor: '#F8FAFC', borderRadius: 20, padding: 18, height: 120, fontSize: 15, color: '#2A2640', borderWidth: 1, borderColor: '#F1F5F9', textAlignVertical: 'top' },
+  sheetActions: { flexDirection: 'row', gap: 12, marginTop: 25 },
+  sBtn: { flex: 1, height: 52, borderRadius: 15, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
+  sBtnT: { color: '#8B8B9B', fontWeight: '700' },
+  pBtn: { flex: 2, height: 52, borderRadius: 15, backgroundColor: '#6345E5', justifyContent: 'center', alignItems: 'center' },
+  pBtnT: { color: '#FFF', fontWeight: '800' },
+
+  detailItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  dL: { color: '#8B8B9B', fontSize: 14 },
+  dV: { color: '#2A2640', fontWeight: '700', fontSize: 14 },
+  hLine: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 15 },
+  detailSub: { color: '#8B8B9B', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
+  noteCard: { backgroundColor: '#F8FAFC', padding: 15, borderRadius: 12 },
+  noteT: { fontSize: 14, color: '#4A465B' },
+  fullBtn: { backgroundColor: '#F1F5F9', height: 52, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 30 },
+  fullBtnT: { color: '#6345E5', fontWeight: '700' },
 });

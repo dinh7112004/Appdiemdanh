@@ -320,11 +320,11 @@ export default function TasksScreen() {
                         </TouchableOpacity>
                     ))}
                     <TouchableOpacity
-                        style={[styles.dateChip, filterDate === 'CUSTOM' && styles.dateChipActive, { flexDirection: 'row', alignItems: 'center' }]}
+                        style={[styles.dateChip, filterDate === 'CUSTOM' && styles.dateChipActive, { flexDirection: 'row', alignItems: 'center', height: 40, paddingHorizontal: 16 }]}
                         onPress={handleOpenDatePicker}
                     >
                         <CalendarIcon size={14} color={filterDate === 'CUSTOM' ? '#FFF' : '#8B8B9B'} style={{ marginRight: 6 }} />
-                        <Text style={[styles.dateChipText, filterDate === 'CUSTOM' && styles.dateChipTextActive]}>
+                        <Text style={[styles.dateChipText, filterDate === 'CUSTOM' && styles.dateChipTextActive, { fontSize: 13 }]}>
                             {filterDate === 'CUSTOM' ? customDate.toLocaleDateString('vi-VN') : 'Chọn ngày'}
                         </Text>
                     </TouchableOpacity>
@@ -410,7 +410,7 @@ export default function TasksScreen() {
                             {selectedTask?.status === 'TODO' ? (
                                 <View style={{ paddingVertical: 10 }}>
                                     <Text style={{ fontSize: 14, color: '#64748B', marginBottom: 20, textAlign: 'center', lineHeight: 22 }}>
-                                        Bạn chưa làm công việc này. Nhấn nút bên dưới để nhận việc và chuyển sang trạng thái "Đang làm" nhé!
+                                        Bạn chưa làm công việc này. Nhấn nút bên dưới để nhận việc và chuyển sang trạng thái &quot;Đang làm&quot; nhé!
                                     </Text>
                                     <TouchableOpacity
                                         style={[styles.submitReportBtn, { backgroundColor: '#D97706' }]}
@@ -490,24 +490,35 @@ export default function TasksScreen() {
                 </View>
             </Modal>
 
-            {/* MODAL LỊCH CHO iOS */}
             {showDatePicker && (
                 Platform.OS === 'ios' ? (
-                    <Modal transparent animationType="slide">
+                    <Modal transparent animationType="slide" visible={showDatePicker}>
                         <View style={styles.iosPickerOverlay}>
                             <View style={styles.iosPickerContainer}>
                                 <View style={styles.iosPickerHeader}>
-                                    <TouchableOpacity onPress={() => setShowDatePicker(false)}><Text style={styles.iosCancelText}>Hủy</Text></TouchableOpacity>
-                                    <TouchableOpacity onPress={() => { setCustomDate(tempDate); setFilterDate('CUSTOM'); setShowDatePicker(false); }}>
+                                    <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{ padding: 10 }}><Text style={styles.iosCancelText}>Hủy</Text></TouchableOpacity>
+                                    <TouchableOpacity onPress={() => { setCustomDate(tempDate); setFilterDate('CUSTOM'); setShowDatePicker(false); }} style={{ padding: 10 }}>
                                         <Text style={styles.iosDoneText}>Xong</Text>
                                     </TouchableOpacity>
                                 </View>
-                                <DateTimePicker value={tempDate} mode="date" display="spinner" onChange={(e, date) => date && setTempDate(date)} />
+                                <DateTimePicker 
+                                    value={tempDate} 
+                                    mode="date" 
+                                    display="spinner" 
+                                    textColor="#000000"
+                                    themeVariant="light"
+                                    onChange={(e, date) => date && setTempDate(date)} 
+                                />
                             </View>
                         </View>
                     </Modal>
                 ) : (
-                    <DateTimePicker value={customDate} mode="date" display="default" onChange={onAndroidDateChange} />
+                    <DateTimePicker 
+                        value={customDate} 
+                        mode="date" 
+                        display="calendar" 
+                        onChange={onAndroidDateChange} 
+                    />
                 )
             )}
         </SafeAreaView>
