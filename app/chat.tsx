@@ -445,7 +445,7 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FE' },
-    loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF' },
     header: { paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F0F0F5', backgroundColor: '#FFF', zIndex: 10 },
     headerRow: { flexDirection: 'row', alignItems: 'center' },
     backBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nhân Sự Pro",
     "slug": "Appdiemdanh-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "appdiemdanhapp",
@@ -13,6 +13,8 @@
       "userInterfaceStyle": "light",
       "bundleIdentifier": "com.appinfor.stag",
       "infoPlist": {
+        "NSCameraUsageDescription": "App cần truy cập Camera để chụp ảnh minh chứng và gửi ảnh trong chat.",
+        "NSPhotoLibraryUsageDescription": "App cần truy cập thư viện ảnh để gửi hình ảnh hỗ trợ.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -41,7 +43,7 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#ffffff"
           }
         }
       ],

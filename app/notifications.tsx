@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     },
     backBtn: { position: 'absolute', left: 16, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100, backgroundColor: '#FFF' },
     listPadding: { padding: 16, paddingBottom: 40 },
     card: {
         flexDirection: 'row',

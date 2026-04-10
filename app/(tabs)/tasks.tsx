@@ -14,6 +14,7 @@ import {
     RefreshControl,
     SafeAreaView,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -299,7 +300,15 @@ export default function TasksScreen() {
         );
     };
 
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#6345E5" /></View>;
+    if (loading) {
+        return (
+            <View style={styles.center}>
+                <StatusBar barStyle="dark-content" />
+                <ActivityIndicator size="large" color="#6345E5" />
+            </View>
+        );
+    }
+
 
     return (
         <SafeAreaView style={styles.container}>
@@ -526,8 +535,8 @@ export default function TasksScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F4F4FA' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
 
     header: { paddingHorizontal: 24, paddingTop: 30, paddingBottom: 16, backgroundColor: '#FFF' },
     headerTitle: { fontSize: 24, fontWeight: '900', color: '#2A2640' },

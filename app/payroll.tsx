@@ -60,17 +60,23 @@ export default function PayrollScreen() {
                 (p.userId?._id === userId || p.userId === userId)
             );
 
+            // --- BẮT ĐẦU ĐOẠN MỚI THAY ĐỔI Ở ĐÂY ---
             if (myPayroll) {
-                const base = myPayroll.userId?.baseSalary || 0;
+                // 1. Lấy thẳng Tổng thực nhận từ Backend
+                const netSalary = myPayroll.netSalary || 0;
+
                 const bonus = myPayroll.bonus || 0;
                 const fine = myPayroll.fine || 0;
 
+                // 2. Tính ngược lại Lương cơ bản dự kiến (Lương ướm theo số giờ làm thực tế)
+                const expectedBase = netSalary - bonus + fine;
+
                 setSalaryData({
                     month: `Tháng ${m}/${y}`,
-                    baseSalary: base,
+                    baseSalary: expectedBase, // Hiển thị lương ướm theo giờ làm
                     bonus: bonus,
                     fine: fine,
-                    total: base + bonus - fine
+                    total: netSalary          // Hiển thị tổng lấy chuẩn 100% từ Backend
                 });
             } else {
                 setSalaryData({
@@ -78,6 +84,8 @@ export default function PayrollScreen() {
                     baseSalary: 0, bonus: 0, fine: 0, total: 0
                 });
             }
+            // --- KẾT THÚC ĐOẠN THAY ĐỔI ---
+
         } catch (error) {
             console.error("Lỗi lấy phiếu lương:", error);
         } finally {
@@ -226,7 +234,7 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginHorizontal: 15 },
 
     content: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 10 },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF' },
     loadingText: { marginTop: 15, color: '#64748B', fontSize: 14, fontWeight: '500' },
 
     // Premium Card (Trái tim của giao diện)

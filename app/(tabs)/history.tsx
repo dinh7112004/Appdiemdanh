@@ -175,7 +175,7 @@ export default function HistoryScreen() {
             </View>
 
             {loading ? (
-                <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator size="large" color="#6345E5" /></View>
+                <View style={{ flex: 1, justifyContent: 'center', backgroundColor: '#FFF' }}><ActivityIndicator size="large" color="#6345E5" /></View>
             ) : (
                 <FlatList
                     data={filteredLogs}
