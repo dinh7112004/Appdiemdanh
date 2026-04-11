@@ -151,7 +151,7 @@ export default function LeaveRequestScreen() {
         if (leaveType === 'SICK' && !image) return Alert.alert("Thiếu giấy tờ ốm đau", "Vui lòng tải lên ảnh giấy khám/ra viện.");
         if (!currentUser) return Alert.alert("Lỗi", "Vui lòng đăng nhập lại.");
 
-        setLoading(true);
+        // Xóa loading block để "bấm phát ăn ngay"
         try {
             const formData = new FormData();
             formData.append('userId', currentUser.id || currentUser._id);
@@ -162,9 +162,29 @@ export default function LeaveRequestScreen() {
                 return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             };
 
-            formData.append('startDate', formatDT(startDate));
-            formData.append('endDate', formatDT(endDate));
-            formData.append('reason', reason);
+            const optimisticStatus = 'PENDING';
+            const optimisticItem = {
+                _id: 'temp_' + Date.now(),
+                userId: currentUser.id || currentUser._id,
+                leaveType: leaveType,
+                startDate: formatDT(startDate),
+                endDate: formatDT(endDate),
+                reason: reason,
+                status: optimisticStatus,
+                createdAt: new Date().toISOString()
+            };
+
+            setHistory(prev => [optimisticItem, ...prev]);
+
+            // Xóa form và thông báo thành công TRƯỚC khi gọi API
+            setReason('');
+            setImage(null);
+            Alert.alert("Thành công 🎉", "Đơn đã được nộp và hiển thị ở lịch sử bên dưới.");
+
+            formData.append('startDate', optimisticItem.startDate);
+            formData.append('endDate', optimisticItem.endDate);
+            formData.append('reason', optimisticItem.reason);
+            // v.v...
 
             if (image) {
                 const filename = image.split('/').pop() || 'evidence.jpg';
@@ -181,12 +201,12 @@ export default function LeaveRequestScreen() {
                 headers: { 'Content-Type': 'multipart/form-data', 'ngrok-skip-browser-warning': 'true' }
             });
 
-            Alert.alert("Thành công 🎉", "Đơn đã được gửi!");
-            setReason('');
-            setImage(null);
+            // Đồng bộ lại ID thật từ DB
             fetchHistory(currentUser.id || currentUser._id);
         } catch (error: any) {
             console.log("Lỗi chi tiết:", error.response?.data || error.message);
+            // Rollback UI nếu lỗi
+            if (currentUser) fetchHistory(currentUser.id || currentUser._id);
             Alert.alert("Lỗi", error.response?.data?.message || "Không thể gửi đơn.");
         } finally {
             setLoading(false);

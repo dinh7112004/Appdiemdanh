@@ -205,7 +205,7 @@ export default function HomeScreen() {
       if (todayLogs.length >= 2) return Alert.alert("Hết lượt", "Đã hoàn thành 2 lượt điểm danh hôm nay.");
     }
     setActionType(action);
-    setLoading(true);
+    // Xóa setLoading(true) ở đây để nút không hiện spinner xoay xoay
     try {
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const currentDist = getDistance(
@@ -213,7 +213,6 @@ export default function HomeScreen() {
         { latitude: officeConfig.latitude, longitude: officeConfig.longitude }
       );
       if (action === 'VÀO' && currentDist > officeConfig.radius) {
-        setLoading(false);
         setModalVisible(true);
       } else {
         submitAttendance(action, currentDist <= officeConfig.radius ? 'OFFICE' : 'REMOTE', action === 'VÀO' ? 'Tại văn phòng' : 'Kết thúc ca', 'APPROVED', currentDist, location.coords.latitude, location.coords.longitude);
@@ -225,6 +224,28 @@ export default function HomeScreen() {
   };
 
   const submitAttendance = async (action: string, loc: string, reqNote: string, status: string, dist: number, lat?: number, lon?: number) => {
+    // Optimistic Update
+    const now = new Date();
+    const tempLog = {
+      _id: 'temp_' + now.getTime(),
+      userId: currentUser?._id || currentUser?.id,
+      createdAt: now.toISOString(),
+      checkInTime: action === 'VÀO' ? now.toISOString() : ongoingSession?.checkInTime,
+      checkOutTime: action === 'RA' ? now.toISOString() : null,
+      type: loc,
+      locationType: loc,
+      note: reqNote,
+      status: status
+    };
+
+    if (action === 'VÀO') {
+      setTodayLogs(prev => [...prev, tempLog]);
+      setStats(prev => ({ ...prev, status: 'Đang làm' }));
+    } else {
+      setTodayLogs(prev => prev.map(l => (l._id === ongoingSession?._id || l.id === ongoingSession?.id) ? tempLog : l));
+      setStats(prev => ({ ...prev, status: 'Đang nghỉ' }));
+    }
+
     try {
       const payload = {
         userId: currentUser?._id || currentUser?.id, distance: dist, type: loc, locationType: loc,
@@ -235,11 +256,16 @@ export default function HomeScreen() {
       } else {
         await axios.post(`${API_BASE}/attendance/checkout`, { ...payload, recordId: ongoingSession?._id || ongoingSession?.id }, { headers: { 'ngrok-skip-browser-warning': 'true' } });
       }
-      Alert.alert("Thành công", `Đã ${action} CA thành công!`);
       setModalVisible(false);
       setReason('');
       fetchOnlyData();
-    } catch (e: any) { Alert.alert("Lỗi", e.response?.data?.message || "Lỗi kết nối Server"); } finally { setLoading(false); }
+    } catch (e: any) {
+      // Rollback on error
+      fetchOnlyData();
+      Alert.alert("Lỗi", e.response?.data?.message || "Lỗi kết nối Server");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const StatCard = ({ title, value, sub, icon: Icon, color, onPress }: any) => (
@@ -255,80 +281,91 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+          const getGreeting = () => {
+            const hour = new Date().getHours();
+            if (hour >= 5 && hour < 11) return "Chào buổi sáng ☀️";
+            if (hour >= 11 && hour < 14) return "Chào buổi trưa 🌤️";
+            if (hour >= 14 && hour < 18) return "Chào buổi chiều 🌥️";
+            return "Chào buổi tối 🌙";
+          };
 
-      {/* WHITE TOP BAR */}
-      <View style={[styles.whiteTopBar, { paddingTop: insets.top }]}>
-        <View style={styles.topRowInner}>
-          <View style={styles.brand}>
-            <Image source={require('../../assets/images/icon.png')} style={{ width: 28, height: 28, borderRadius: 6 }} />
-            <Text style={styles.brandTitleDark}>HRM PRO</Text>
-          </View>
-          <TouchableOpacity style={styles.notifBtnLight} onPress={() => router.push('/notifications')}>
-            <Bell size={22} color="#6345E5" />
-            {unreadCount > 0 && <View style={styles.unreadDot} />}
-          </TouchableOpacity>
-        </View>
-      </View>
+          return (
+            <View style={styles.container}>
+              <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* GRADIENT HEADER */}
-      <View style={styles.headerWrapper}>
-        <LinearGradient
-          colors={['#6345E5', '#3F2B96']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          {/* USER INFO */}
-          <View style={styles.userRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.greeting}>Xin chào 👋</Text>
-              <Text style={styles.userNameHeader}>{currentUser.name || "Nhân viên"}</Text>
-              <View style={styles.locBadge}>
-                <MapPin size={12} color="#FFF" />
-                <Text style={styles.locText}>Khu vực: {isStrictlyAtOffice ? "Văn phòng" : "Từ xa"}</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.avatarBig} onPress={() => router.push('/(tabs)/profile')}>
-              <UserCircle size={48} color="rgba(255,255,255,1)" />
-            </TouchableOpacity>
-          </View>
-
-          {/* PRIMARY ATTENDANCE CARD */}
-          <View style={styles.attendanceBox}>
-            <View style={[styles.attendanceInfo, (isMaxTurnsReached || isLeaveToday) && { alignItems: 'center' }]}>
-              <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6 }, (isMaxTurnsReached || isLeaveToday) && { justifyContent: 'center' }]}>
-                <Clock size={16} color="#8B8B9B" />
-                <Text style={[styles.attendanceLabel, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center' }]}>
-                  {isLeaveToday ? "ĐANG NGHỈ PHÉP" : (isMaxTurnsReached ? "ĐÃ HOÀN THÀNH ĐIỂM DANH" : "ĐIỂM DANH HÔM NAY")}
-                </Text>
-              </View>
-              <Text style={[styles.attendanceTimeText, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center', marginTop: 10 }]}>{currentTime}</Text>
-              <Text style={[styles.attendanceDateText, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center' }]}>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}</Text>
-            </View>
-            {!(isMaxTurnsReached || isLeaveToday) && (
-              <>
-                <View style={styles.vDivider} />
-                <View style={styles.attendanceBtnWrapper}>
-                  <TouchableOpacity
-                    style={[styles.checkBtn, ongoingSession && styles.checkBtnActive]}
-                    onPress={() => ongoingSession ? handlePress('RA') : handlePress('VÀO')}
-                    disabled={loading}
-                  >
-                    {loading ? <ActivityIndicator size="small" color="#6345E5" /> : (
-                      <Text style={[styles.checkBtnText, ongoingSession && { color: '#EF4444' }]}>
-                        {ongoingSession ? "RA CA" : "VÀO CA"}
-                      </Text>
-                    )}
+              {/* WHITE TOP BAR */}
+              <View style={[styles.whiteTopBar, { paddingTop: insets.top }]}>
+                <View style={styles.topRowInner}>
+                  <View style={styles.brand}>
+                    <Image source={require('../../assets/images/icon.png')} style={{ width: 28, height: 28, borderRadius: 6 }} />
+                    <Text style={styles.brandTitleDark}>HRM PRO</Text>
+                  </View>
+                  <TouchableOpacity style={styles.notifBtnLight} onPress={() => router.push('/notifications')}>
+                    <Bell size={22} color="#6345E5" />
+                    {unreadCount > 0 && <View style={styles.unreadDot} />}
                   </TouchableOpacity>
                 </View>
-              </>
-            )}
-          </View>
-        </LinearGradient>
-      </View>
+              </View>
+
+              {/* GRADIENT HEADER */}
+              <View style={styles.headerWrapper}>
+                <LinearGradient
+                  colors={['#6345E5', '#3F2B96']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.headerGradient}
+                >
+                  {/* USER INFO */}
+                  <View style={styles.userRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.greeting}>{getGreeting()}</Text>
+                      <Text style={styles.userNameHeader}>{currentUser.name || "Nhân viên"}</Text>
+                      <View style={styles.locBadge}>
+                        <MapPin size={12} color="#FFF" />
+                        <Text style={styles.locText}>Khu vực: {isStrictlyAtOffice ? "Văn phòng" : "Từ xa"}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.avatarBig} onPress={() => router.push('/(tabs)/profile')}>
+                      <UserCircle size={48} color="rgba(255,255,255,1)" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* PRIMARY ATTENDANCE CARD */}
+                  <View style={styles.attendanceBox}>
+                    <View style={[styles.attendanceInfo, (isMaxTurnsReached || isLeaveToday) && { alignItems: 'center' }]}>
+                      <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6 }, (isMaxTurnsReached || isLeaveToday) && { justifyContent: 'center' }]}>
+                        <Clock size={16} color="#8B8B9B" />
+                        <Text style={[styles.attendanceLabel, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center' }]}>
+                          {isLeaveToday ? "ĐANG NGHỈ PHÉP" : (isMaxTurnsReached ? "HOÀN THÀNH ĐIỂM DANH" : "ĐIỂM DANH HÔM NAY")}
+                        </Text>
+                      </View>
+                      <Text style={[styles.attendanceTimeText, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center', marginTop: 10 }]}>{currentTime}</Text>
+                      <Text style={[styles.attendanceDateText, (isMaxTurnsReached || isLeaveToday) && { textAlign: 'center' }]}>
+                        {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
+                      </Text>
+                    </View>
+                    
+                    {!(isMaxTurnsReached || isLeaveToday) && (
+                      <>
+                        <View style={styles.vDivider} />
+                        <View style={styles.attendanceBtnWrapper}>
+                          <TouchableOpacity
+                            style={[styles.checkBtn, ongoingSession && styles.checkBtnActive]}
+                            onPress={() => ongoingSession ? handlePress('RA') : handlePress('VÀO')}
+                            disabled={loading}
+                          >
+                            {loading ? <ActivityIndicator size="small" color="#6345E5" /> : (
+                              <Text style={[styles.checkBtnText, ongoingSession && { color: '#EF4444' }]}>
+                                {ongoingSession ? "RA CA" : "VÀO CA"}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                </LinearGradient>
+              </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
 
@@ -563,17 +600,28 @@ const styles = StyleSheet.create({
   avatarBig: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
   avatarImg: { width: '100%', height: '100%' },
 
-  attendanceBox: { backgroundColor: '#FFF', borderRadius: 28, padding: 22, flexDirection: 'row', alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10 },
-  attendanceInfo: { flex: 1 },
+  attendanceBox: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 28, 
+    padding: 22, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    elevation: 10, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.15, 
+    shadowRadius: 10,
+    minHeight: 140 // Cố định chiều cao để không bị nhảy layout
+  },
+  attendanceInfo: { flex: 1.5 },
   attendanceLabel: { color: '#8B8B9B', fontSize: 11, fontWeight: '800' },
   attendanceTimeText: { color: '#2A2640', fontSize: 32, fontWeight: '900' },
   attendanceDateText: { color: '#8B8B9B', fontSize: 13, marginTop: 2 },
   vDivider: { width: 1, height: 50, backgroundColor: '#F1F5F9', marginHorizontal: 15 },
-  attendanceBtnWrapper: { alignItems: 'center' },
-  checkBtn: { paddingHorizontal: 18, height: 44, borderRadius: 15, borderWidth: 1.5, borderColor: '#6345E5', justifyContent: 'center' },
+  attendanceBtnWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  checkBtn: { width: '100%', height: 52, borderRadius: 16, borderWidth: 2, borderColor: '#6345E5', justifyContent: 'center', alignItems: 'center' },
   checkBtnActive: { borderColor: '#EF4444' },
   checkBtnDisabled: { borderColor: '#EAEAF2' },
-  checkBtnText: { color: '#6345E5', fontWeight: '900', fontSize: 13 },
+  checkBtnText: { color: '#6345E5', fontWeight: '900', fontSize: 14 },
 
   scrollBody: { paddingHorizontal: 20, paddingTop: 25 },
   statsLayout: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 25 },

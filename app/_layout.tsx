@@ -140,6 +140,7 @@ export default function RootLayout() {
           <Stack.Screen name="leave-request" options={{ headerShown: false }} />
           <Stack.Screen name="chat" options={{ headerShown: false }} />
           <Stack.Screen name="payroll" options={{ headerShown: false }} />
+          <Stack.Screen name="payroll-detail" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
