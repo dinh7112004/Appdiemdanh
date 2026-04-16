@@ -47,7 +47,10 @@ export default function PayrollScreen() {
         totalLate: 0,
         bonus: 0,
         fine: 0,
-        total: 0
+        total: 0,
+        totalFull: 0,
+        hourlyRate: 0,
+        status: 'PENDING'
     });
 
     const fetchMyPayroll = async () => {
@@ -60,92 +63,28 @@ export default function PayrollScreen() {
             const y = currentDate.getFullYear();
             const apiMonth = `${String(m).padStart(2, '0')}-${y}`;
 
-            const [payrollRes, attendanceRes, logsRes] = await Promise.all([
-                axios.get(`${API_BASE}/payroll/report?month=${apiMonth}`, {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
-                }),
-                axios.get(`${API_BASE}/attendance/report/monthly?month=${m}&year=${y}`, {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
-                }),
-                axios.get(`${API_BASE}/attendance`, {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
-                })
-            ]);
+            const url = `${API_BASE}/payroll/mobile-data?userId=${userId}&month=${apiMonth}`;
+            console.log("Fetching payroll from:", url);
 
-            const myPayroll = payrollRes.data.find((p: any) =>
-                String(p.userId?._id || p.userId) === String(userId)
-            ) || {};
-
-            const myAttendanceReport = attendanceRes.data.find((a: any) =>
-                String(a.userId?._id || a.userId) === String(userId)
-            ) || {};
-
-            const myLogs = logsRes.data.filter((log: any) => {
-                const logUserId = log.userId?._id || log.userId;
-                const logDate = new Date(log.createdAt);
-                return String(logUserId) === String(userId) &&
-                    (logDate.getMonth() + 1) === m &&
-                    logDate.getFullYear() === y;
+            const res = await axios.get(url, {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
             });
 
-            let totalMinutesWorked = 0;
-            const dailyLogs: { [key: string]: any[] } = {};
-
-            myLogs.forEach((log: any) => {
-                if (log.checkInTime && log.checkOutTime) {
-                    const diffMs = new Date(log.checkOutTime).getTime() - new Date(log.checkInTime).getTime();
-                    if (diffMs > 0) {
-                        totalMinutesWorked += diffMs / (1000 * 60);
-                    }
-                }
-                const dateKey = new Date(log.createdAt).toISOString().split('T')[0];
-                if (!dailyLogs[dateKey]) dailyLogs[dateKey] = [];
-                dailyLogs[dateKey].push(log);
-            });
-
-            let calculatedLateCount = 0;
-            Object.values(dailyLogs).forEach(logs => {
-                const sortedLogs = logs.sort((a, b) => {
-                    const timeA = a.checkInTime ? new Date(a.checkInTime).getTime() : new Date(a.createdAt).getTime();
-                    const timeB = b.checkInTime ? new Date(b.checkInTime).getTime() : new Date(b.createdAt).getTime();
-                    return timeA - timeB;
-                });
-
-                const firstLog = sortedLogs[0];
-                if (firstLog && firstLog.checkInTime) {
-                    const checkIn = new Date(firstLog.checkInTime);
-                    if (checkIn.getHours() > 8 || (checkIn.getHours() === 8 && checkIn.getMinutes() > 0)) {
-                        calculatedLateCount++;
-                    }
-                }
-            });
-
-            const totalHoursWorked = totalMinutesWorked / 60;
-            const totalApproved = Number(myAttendanceReport.totalApproved || myAttendanceReport.total_approved || 0);
-
-            const monthlyBase = Number(myPayroll.userId?.baseSalary || myPayroll.baseSalary) || 0;
-
-            let hourlyRate = Number(myPayroll.userId?.hourlySalary || myPayroll.hourlySalary || 0);
-            if (hourlyRate === 0 && monthlyBase > 0) {
-                hourlyRate = monthlyBase / 208;
-            }
-
-            const earnedSalary = Math.round(totalHoursWorked * hourlyRate);
-            const bonus = Number(myPayroll.bonus || 0);
-            const fine = Number(myPayroll.fine || 0);
-
-            const totalReceived = Math.max(0, monthlyBase + bonus - fine);
+            const myPayroll = res.data || {};
 
             setSalaryData({
                 month: `Tháng ${String(m).padStart(2, '0')}/${y}`,
-                monthlyBase: monthlyBase,
-                earnedSalary: earnedSalary,
-                totalHours: Number(totalHoursWorked.toFixed(2)),
-                totalApproved: totalApproved,
-                totalLate: calculatedLateCount,
-                bonus: bonus,
-                fine: fine,
-                total: totalReceived
+                monthlyBase: Number(myPayroll.baseSalary || 0),
+                earnedSalary: Number(myPayroll.netSalary || 0) - Number(myPayroll.bonus || 0) + Number(myPayroll.fine || 0),
+                totalHours: Number((myPayroll.actualWorkHours || 0).toFixed(2)),
+                totalApproved: Number((myPayroll.actualWorkDays || 0).toFixed(2)),
+                totalLate: Number(myPayroll.lateCount || 0),
+                bonus: Number(myPayroll.bonus || 0),
+                fine: Number(myPayroll.fine || 0),
+                total: Number(myPayroll.netSalary || 0),
+                totalFull: Number(myPayroll.netSalaryFull || 0),
+                hourlyRate: Number(myPayroll.hourlyRate || 0),
+                status: myPayroll.status || 'PENDING'
             });
 
         } catch (error) {
@@ -154,6 +93,7 @@ export default function PayrollScreen() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchMyPayroll();
@@ -216,10 +156,14 @@ export default function PayrollScreen() {
                                 <Sparkles size={14} color="#FEF08A" />
                                 <Text style={styles.totalLabel}>TỔNG THỰC NHẬN</Text>
                             </View>
-                            <View style={styles.statusBadge}>
-                                <CheckCircle2 size={12} color="#10B981" />
-                                <Text style={styles.statusText}>
-                                    {salaryData.total > 0 ? 'Đã chốt lương' : 'Chưa phát sinh'}
+                            <View style={[styles.statusBadge, { backgroundColor: salaryData.status === 'PAID' ? '#EEF2FF' : (salaryData.status === 'CHECKED' ? '#ECFDF5' : '#FFF7ED') }]}>
+                                {salaryData.status === 'PAID' ? (
+                                    <CheckCircle2 size={12} color="#4F46E5" />
+                                ) : (
+                                    <Timer size={12} color={salaryData.status === 'CHECKED' ? '#10B981' : '#F59E0B'} />
+                                )}
+                                <Text style={[styles.statusText, { color: salaryData.status === 'PAID' ? '#4F46E5' : (salaryData.status === 'CHECKED' ? '#10B981' : '#F59E0B') }]}>
+                                    {salaryData.status === 'PAID' ? 'Đã chi lương' : (salaryData.status === 'CHECKED' ? 'Đã chốt' : 'Chờ duyệt')}
                                 </Text>
                             </View>
                         </View>
@@ -229,8 +173,10 @@ export default function PayrollScreen() {
                             <Text style={styles.currency}>đ</Text>
                         </View>
 
+
+
                         <View style={styles.cardFooter}>
-                            <Text style={styles.cardFooterText}>Cơ bản + Thưởng - Giảm trừ</Text>
+                            <Text style={styles.cardFooterText}>8 giờ = 1 công • Đơn giá: {salaryData.hourlyRate.toLocaleString()}đ/h</Text>
                         </View>
                     </View>
 
@@ -536,14 +482,58 @@ const styles = StyleSheet.create({
         marginBottom: 6
     },
     cardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 16,
         borderTopWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        paddingTop: 16
+        borderTopColor: 'rgba(255, 255, 255, 0.1)',
+        marginTop: 4
     },
     cardFooterText: {
-        color: '#A5B4FC',
-        fontSize: 13,
-        fontWeight: '500'
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 0.5
+    },
+    dualSalaryLabels: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        marginBottom: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        alignSelf: 'flex-start'
+    },
+    dualItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6
+    },
+    dualLabel: {
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 0.8
+    },
+    dualDivider: {
+        width: 1,
+        height: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        marginHorizontal: 12
+    },
+    activeDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#FEF08A'
+    },
+    dualValueSmall: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+        marginLeft: 4
     },
 
     // THIẾT KẾ CÁC CARD CHI TIẾT

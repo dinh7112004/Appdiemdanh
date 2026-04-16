@@ -79,9 +79,6 @@ export default function ProfileScreen() {
             <LinearGradient colors={['#6345E5', '#3F2B96']} style={styles.headerBackground}>
                 <View style={styles.headerNav}>
                     <Text style={styles.headerTitle}>Cá nhân</Text>
-                    <TouchableOpacity style={styles.settingsBtn}>
-                        <Settings size={22} color="#FFF" />
-                    </TouchableOpacity>
                 </View>
             </LinearGradient>
 
@@ -178,7 +175,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F4FA' },
     headerBackground: { height: 200, paddingTop: 60, paddingHorizontal: 24, borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
     headerNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    headerTitle: { fontSize: 26, fontWeight: '900', color: '#000000ff' },
+    headerTitle: { fontSize: 28, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
     settingsBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
     content: { flex: 1, paddingHorizontal: 24, marginTop: -70 },
     profileCard: { backgroundColor: '#FFF', borderRadius: 32, padding: 24, marginBottom: 24, shadowColor: '#6345E5', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },

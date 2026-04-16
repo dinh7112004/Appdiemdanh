@@ -282,8 +282,8 @@ export default function TasksScreen() {
 
                     <View style={styles.taskFooter}>
                         <View style={styles.deadlineBox}>
-                            <Timer size={14} color={overdue ? '#EF4444' : '#8B8B9B'} />
-                            <Text style={[styles.deadlineText, overdue && { color: '#EF4444', fontWeight: '700' }]}>
+                            <Timer size={16} color={overdue ? '#EF4444' : '#8B8B9B'} />
+                            <Text style={[styles.deadlineText, overdue && { color: '#EF4444', fontWeight: '800' }]}>
                                 {overdue ? `Trễ từ: ` : `Hạn: `}
                                 {new Date(item.dueDate).toLocaleDateString('vi-VN')}
                             </Text>
@@ -295,7 +295,6 @@ export default function TasksScreen() {
                         </View>
                     </View>
                 </View>
-                <ChevronRight size={18} color="#C1C1D6" />
             </TouchableOpacity>
         );
     };
@@ -535,74 +534,74 @@ export default function TasksScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
+    container: { flex: 1, backgroundColor: '#F8F8FC' },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F8FC' },
 
     header: { paddingHorizontal: 24, paddingTop: 30, paddingBottom: 16, backgroundColor: '#FFF' },
-    headerTitle: { fontSize: 24, fontWeight: '900', color: '#2A2640' },
-    headerSub: { fontSize: 13, color: '#8B8B9B', marginTop: 4, fontWeight: '500' },
+    headerTitle: { fontSize: 28, fontWeight: '900', color: '#1A1A24', letterSpacing: -0.5 },
+    headerSub: { fontSize: 14, color: '#8B8B9B', marginTop: 4, fontWeight: '500' },
 
-    dateFilterContainer: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 20, paddingBottom: 16, gap: 10 },
-    dateChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F9F9FC', borderWidth: 1, borderColor: '#EAEAF2' },
-    dateChipActive: { backgroundColor: '#6345E5', borderColor: '#6345E5' },
-    dateChipText: { fontSize: 12, color: '#8B8B9B', fontWeight: '600' },
+    dateFilterContainer: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 24, paddingVertical: 12, gap: 12 },
+    dateChip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 24, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EAEAF2' },
+    dateChipActive: { backgroundColor: '#6345E5', borderColor: '#6345E5', shadowColor: '#6345E5', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    dateChipText: { fontSize: 14, color: '#8B8B9B', fontWeight: '600' },
     dateChipTextActive: { color: '#FFF' },
 
-    filterContainer: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 10, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, shadowColor: '#6345E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, marginBottom: 10 },
-    filterTab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-    filterLabel: { fontSize: 12, color: '#A0A0B5', fontWeight: '600' },
+    filterContainer: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F5', marginBottom: 16, justifyContent: 'space-around' },
+    filterTab: { paddingVertical: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', paddingHorizontal: 8 },
+    filterLabel: { fontSize: 14, color: '#A0A0B5', fontWeight: '600' },
 
-    taskList: { padding: 20 },
-    taskCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 20, borderRadius: 24, marginBottom: 14, shadowColor: '#6345E5', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
-    taskInfo: { flex: 1, marginRight: 12 },
-    taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    taskTitle: { fontSize: 16, fontWeight: '800', color: '#2A2640', flex: 1, paddingRight: 10 },
-    taskDesc: { fontSize: 13, color: '#8B8B9B', marginBottom: 14, lineHeight: 20 },
-    taskFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    taskList: { paddingHorizontal: 20, paddingBottom: 40 },
+    taskCard: { flexDirection: 'column', backgroundColor: '#FFF', padding: 22, borderRadius: 24, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 4, borderWidth: 1, borderColor: '#F4F4FA' },
+    taskInfo: { flex: 1 },
+    taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+    taskTitle: { fontSize: 19, fontWeight: '900', color: '#1A1A24', flex: 1, paddingRight: 10, lineHeight: 26 },
+    taskDesc: { fontSize: 14, color: '#64748B', marginBottom: 18, lineHeight: 22 },
+    taskFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F4F4FA' },
     deadlineBox: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    deadlineText: { fontSize: 11, color: '#8B8B9B', fontWeight: '600' },
-    progressBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-    progressText: { fontSize: 11, fontWeight: '800' },
+    deadlineText: { fontSize: 13, color: '#8B8B9B', fontWeight: '600' },
+    progressBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+    progressText: { fontSize: 12, fontWeight: '800' },
 
-    emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60 },
-    emptyIconWrap: { backgroundColor: '#EAEAF2', padding: 20, borderRadius: 40, marginBottom: 16 },
-    emptyText: { color: '#8B8B9B', fontSize: 14, fontWeight: '500' },
+    emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
+    emptyIconWrap: { backgroundColor: '#F0EDFD', padding: 24, borderRadius: 40, marginBottom: 20 },
+    emptyText: { color: '#8B8B9B', fontSize: 15, fontWeight: '500' },
 
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(42, 38, 64, 0.4)', justifyContent: 'flex-end' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(26, 26, 36, 0.5)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 30, paddingBottom: Platform.OS === 'ios' ? 45 : 30 },
     modalHeaderIndicator: { width: 50, height: 5, backgroundColor: '#EAEAF2', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    modalTopTitle: { fontSize: 18, fontWeight: '800', color: '#2A2640' },
-    closeBtn: { padding: 6, backgroundColor: '#F9F9FC', borderRadius: 20 },
-    detailTitle: { fontSize: 20, fontWeight: '800', color: '#2A2640', marginBottom: 12, lineHeight: 28 },
-    detailMetaRow: { flexDirection: 'row', gap: 20, marginBottom: 10 },
-    detailMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    detailMetaText: { fontSize: 13, color: '#64748B', fontWeight: '600' },
-    detailSectionTitle: { fontSize: 13, color: '#8B8B9B', fontWeight: '700', textTransform: 'uppercase', marginBottom: 12 },
-    divider: { height: 1, backgroundColor: '#EAEAF2', marginVertical: 15 },
+    modalTopTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A24' },
+    closeBtn: { padding: 8, backgroundColor: '#F4F4FA', borderRadius: 20 },
+    detailTitle: { fontSize: 22, fontWeight: '900', color: '#1A1A24', marginBottom: 14, lineHeight: 30 },
+    detailMetaRow: { flexDirection: 'row', gap: 20, marginBottom: 12 },
+    detailMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    detailMetaText: { fontSize: 14, color: '#64748B', fontWeight: '600' },
+    detailSectionTitle: { fontSize: 14, color: '#8B8B9B', fontWeight: '800', textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 },
+    divider: { height: 1, backgroundColor: '#F0F0F5', marginVertical: 20 },
 
-    progressBtnRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    progressBtn: { flex: 1, paddingVertical: 12, marginHorizontal: 3, borderRadius: 12, backgroundColor: '#F0F0F5', alignItems: 'center' },
-    progressBtnActive: { backgroundColor: '#6345E5' },
-    progressBtnText: { fontSize: 13, fontWeight: '700', color: '#8B8B9B' },
+    progressBtnRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+    progressBtn: { flex: 1, paddingVertical: 14, marginHorizontal: 4, borderRadius: 14, backgroundColor: '#F4F4FA', alignItems: 'center' },
+    progressBtnActive: { backgroundColor: '#6345E5', shadowColor: '#6345E5', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    progressBtnText: { fontSize: 14, fontWeight: '800', color: '#8B8B9B' },
     progressBtnTextActive: { color: '#FFF' },
 
-    imagePickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16, borderRadius: 16, backgroundColor: '#6345E515', borderStyle: 'dashed', borderWidth: 1, borderColor: '#6345E5', marginBottom: 20 },
-    imagePickerText: { fontSize: 14, fontWeight: '700', color: '#6345E5' },
+    imagePickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 18, borderRadius: 16, backgroundColor: '#F0EDFD', borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#6345E5', marginBottom: 24 },
+    imagePickerText: { fontSize: 15, fontWeight: '700', color: '#6345E5' },
 
-    previewImageContainer: { position: 'relative', marginBottom: 20, alignSelf: 'center' },
-    previewImage: { width: 200, height: 150, borderRadius: 16 },
-    removeImageBtn: { position: 'absolute', top: -10, right: -10, backgroundColor: '#EF4444', padding: 6, borderRadius: 15, borderWidth: 2, borderColor: '#FFF' },
+    previewImageContainer: { position: 'relative', marginBottom: 24, alignSelf: 'center' },
+    previewImage: { width: 220, height: 165, borderRadius: 20 },
+    removeImageBtn: { position: 'absolute', top: -12, right: -12, backgroundColor: '#EF4444', padding: 8, borderRadius: 20, borderWidth: 3, borderColor: '#FFF', shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
 
-    submitReportBtn: { backgroundColor: '#6345E5', padding: 18, borderRadius: 20, alignItems: 'center', marginTop: 10 },
-    submitReportText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+    submitReportBtn: { backgroundColor: '#6345E5', padding: 20, borderRadius: 20, alignItems: 'center', marginTop: 10, shadowColor: '#6345E5', shadowOffset: {width: 0, height: 6}, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+    submitReportText: { color: '#FFF', fontSize: 17, fontWeight: '800', letterSpacing: 0.5 },
 
-    overdueBadge: { backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#FECACA' },
-    overdueText: { color: '#EF4444', fontSize: 10, fontWeight: '900' },
+    overdueBadge: { backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA' },
+    overdueText: { color: '#EF4444', fontSize: 11, fontWeight: '900' },
 
     iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-    iosPickerContainer: { backgroundColor: '#FFF', paddingBottom: 30, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-    iosPickerHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: '#EAEAF2' },
-    iosCancelText: { color: '#EF4444', fontSize: 16, fontWeight: '600' },
-    iosDoneText: { color: '#6345E5', fontSize: 16, fontWeight: '700' },
+    iosPickerContainer: { backgroundColor: '#FFF', paddingBottom: 30, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+    iosPickerHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderColor: '#F0F0F5' },
+    iosCancelText: { color: '#EF4444', fontSize: 17, fontWeight: '600' },
+    iosDoneText: { color: '#6345E5', fontSize: 17, fontWeight: '700' },
 });

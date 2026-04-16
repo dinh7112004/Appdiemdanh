@@ -55,9 +55,10 @@ export default function PayrollDetailScreen() {
             const monthStr = `${String(m).padStart(2, '0')}-${y}`;
 
             if (type === 'attendance') {
-                const res = await axios.get(`${API_BASE}/attendance`, {
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
-                });
+                const [res, leavesRes] = await Promise.all([
+                    axios.get(`${API_BASE}/attendance`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
+                    axios.get(`${API_BASE}/leaves/user/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
+                ]);
 
                 if (!Array.isArray(res.data)) {
                     setListData([]);
@@ -73,11 +74,53 @@ export default function PayrollDetailScreen() {
                         logDate.getFullYear() === y;
                 });
 
-                let finalLogs = myLogs;
+                const parseCustomDate = (dateStr: string) => {
+                    let d = new Date(dateStr);
+                    if (!isNaN(d.getTime())) return d;
+                    if (typeof dateStr === 'string') {
+                        const parts = dateStr.split(' ');
+                        const dateParts = parts[0].split('/');
+                        if (dateParts.length === 3) {
+                            const py = parseInt(dateParts[2]);
+                            const pm = parseInt(dateParts[1]) - 1;
+                            const pday = parseInt(dateParts[0]);
+                            let hh = 0, mm = 0;
+                            if (parts[1]) {
+                                const timeParts = parts[1].split(':');
+                                hh = parseInt(timeParts[0]) || 0;
+                                mm = parseInt(timeParts[1]) || 0;
+                            }
+                            return new Date(py, pm, pday, hh, mm);
+                        }
+                    }
+                    return new Date();
+                };
+
+                const myLeaves = Array.isArray(leavesRes.data) ? leavesRes.data.filter((lv: any) => {
+                    if (lv.status !== 'APPROVED') return false;
+                    const lvDate = parseCustomDate(lv.startDate || lv.createdAt);
+                    return (lvDate.getMonth() + 1) === m && lvDate.getFullYear() === y;
+                }).map((lv: any) => {
+                    const lvStart = parseCustomDate(lv.startDate || lv.createdAt);
+                    const lvEnd = lv.endDate ? parseCustomDate(lv.endDate) : null;
+                    return {
+                        _id: lv._id,
+                        createdAt: lvStart.toISOString(),
+                        checkInTime: lvStart.toISOString(),
+                        checkOutTime: lvEnd ? lvEnd.toISOString() : null,
+                        status: 'APPROVED',
+                        locationType: 'LEAVE',
+                        note: `Nghỉ phép hưởng lương (+${lv.paidHours || 0}h)`,
+                        isLeave: true,
+                        paidHours: lv.paidHours
+                    };
+                }) : [];
+
+                let finalLogs = [];
                 let summaryInfo = { total: 0, count: 0, label: '' };
 
                 if (filter === 'approved') {
-                    finalLogs = myLogs.filter((l: any) => l.status === 'APPROVED');
+                    finalLogs = [...myLogs, ...myLeaves].filter((l: any) => l.status === 'APPROVED');
                     summaryInfo.label = 'Số ngày công đã duyệt';
                 } else if (filter === 'late') {
                     finalLogs = myLogs.filter((l: any) => {
@@ -87,42 +130,55 @@ export default function PayrollDetailScreen() {
                     });
                     summaryInfo.label = 'Số lần đi muộn / về sớm';
                 } else {
-                    summaryInfo.label = 'Tổng số buổi chấm công';
+                    finalLogs = [...myLogs, ...myLeaves];
+                    summaryInfo.label = 'Tổng số buổi điểm danh & Nghỉ phép';
                 }
 
                 let totalHours = 0;
                 finalLogs.forEach((l: any) => {
-                    if (l.checkInTime && l.checkOutTime) {
+                    if (l.isLeave) {
+                        totalHours += (l.paidHours || 0);
+                    } else if (l.checkInTime && l.checkOutTime) {
                         totalHours += (new Date(l.checkOutTime).getTime() - new Date(l.checkInTime).getTime()) / 3600000;
                     }
                 });
 
                 summaryInfo.count = finalLogs.length;
-                summaryInfo.total = Number(totalHours.toFixed(1));
+                summaryInfo.total = Number(totalHours.toFixed(2));
                 setSummary(summaryInfo);
                 setListData(finalLogs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             } else {
-                const res = await axios.get(`${API_BASE}/payroll/report?month=${monthStr}`, {
+                const url = `${API_BASE}/payroll/mobile-data?userId=${userId}&month=${monthStr}`;
+                console.log("Fetching detail from:", url);
+                const res = await axios.get(url, {
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
 
-                const myPayroll = Array.isArray(res.data) ? res.data.find((p: any) => {
-                    const pUserId = p.userId?._id ? String(p.userId._id) : String(p.userId);
-                    return pUserId === String(userId);
-                }) : null;
+                const myPayroll = res.data || {};
 
                 if (myPayroll) {
                     const amount = type === 'bonus' ? (myPayroll.bonus || 0) : (myPayroll.fine || 0);
+                    const details = type === 'bonus' ? (myPayroll.bonusDetails || []) : (myPayroll.fineDetails || []);
+                    
                     setSummary({
                         label: type === 'bonus' ? 'Tổng tiền thưởng & phụ cấp' : 'Tổng tiền giảm trừ & phạt',
                         count: amount.toLocaleString() + ' đ'
                     });
 
-                    setListData([{
-                        title: type === 'bonus' ? 'Thưởng chuyên cần & Phụ cấp' : 'Khấu trừ đi muộn & Vi phạm',
-                        value: amount,
-                        note: type === 'bonus' ? 'Lương tăng ca, thưởng nóng và các khoản hỗ trợ.' : 'Trừ lương do vi phạm thời gian hoặc quy định.'
-                    }]);
+                    if (details.length > 0) {
+                        setListData(details.map((d: any) => ({
+                            title: d.reason || (type === 'bonus' ? 'Thưởng/Phụ cấp' : 'Khấu trừ/Phạt'),
+                            value: d.amount,
+                            note: d.date ? new Date(d.date).toLocaleDateString('vi-VN') : 'Trong tháng'
+                        })));
+                    } else {
+                        // Trường hợp có tổng nhưng không có chi tiết (do phiên bản cũ) thì hiện dòng tổng quát
+                        setListData([{
+                            title: type === 'bonus' ? 'Thưởng chuyên cần & Phụ cấp' : 'Khấu trừ đi muộn & Vi phạm',
+                            value: amount,
+                            note: 'Thông tin tổng hợp trong tháng'
+                        }]);
+                    }
                 }
             }
         } catch (error: any) {
@@ -161,8 +217,8 @@ export default function PayrollDetailScreen() {
             hours = (checkOut.getTime() - checkIn.getTime()) / 3600000;
         }
 
-        const isLate = checkIn.getHours() > 8 || (checkIn.getHours() === 8 && checkIn.getMinutes() > 0);
-        const locationStr = item.locationType === 'OFFICE' ? 'Văn phòng' : 'Ngoài VP';
+        const isLate = !item.isLeave && (checkIn.getHours() > 8 || (checkIn.getHours() === 8 && checkIn.getMinutes() > 0));
+        const locationStr = item.locationType === 'LEAVE' ? 'Nghỉ phép' : (item.locationType === 'OFFICE' ? 'Văn phòng' : 'Ngoài VP');
         const statusStr = item.status === 'APPROVED' ? 'Đã duyệt' : 'Chờ duyệt';
 
         return (
@@ -173,13 +229,17 @@ export default function PayrollDetailScreen() {
                         <View style={styles.miniBadge}><Text style={styles.miniBadgeText}>{locationStr}</Text></View>
                     </View>
                     <Text style={styles.itemTime}>
-                        {checkIn.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                        {checkOut ? ` - ${checkOut.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ' - Chưa Checkout'}
+                        {item.isLeave 
+                            ? 'Miễn điểm danh' 
+                            : `${checkIn.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${checkOut ? ` - ${checkOut.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ' - Chưa Checkout'}`
+                        }
                     </Text>
-                    {item.note && <Text style={styles.itemNote}>"{item.note}"</Text>}
+                    {item.note && <Text style={[styles.itemNote, item.isLeave && { backgroundColor: '#E0E7FF', color: '#4338CA' }]}>"{item.note}"</Text>}
                 </View>
                 <View style={styles.itemRight}>
-                    <Text style={styles.itemValue}>{hours > 0 ? `${hours.toFixed(1)}h` : '--'}</Text>
+                    <Text style={[styles.itemValue, item.isLeave && { color: '#4338CA' }]}>
+                        {item.isLeave ? `+${item.paidHours || 0}h` : (hours > 0 ? `${hours.toFixed(1)}h` : '--')}
+                    </Text>
                     <View style={[styles.badge, { backgroundColor: item.status === 'APPROVED' ? '#DCFCE7' : '#FEF9C3' }]}>
                         <Text style={[styles.badgeText, { color: item.status === 'APPROVED' ? '#16A34A' : '#A16207' }]}>{statusStr}</Text>
                     </View>

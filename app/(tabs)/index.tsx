@@ -140,11 +140,15 @@ export default function HomeScreen() {
 
   const fetchLeaveStatus = async (userId: string) => {
     try {
-      const res = await axios.get(`${API_BASE}/leaves/user/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+      const [res, userRes] = await Promise.all([
+        axios.get(`${API_BASE}/leaves/user/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
+        axios.get(`${API_BASE}/users/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
+      ]);
+      const balance = userRes.data?.leaveBalance ?? 96;
       const todayStr = new Date().toLocaleDateString('vi-VN');
-      const hasApprovedLeave = res.data.some((leave: any) => leave.status === 'APPROVED' && leave.startDate === todayStr);
+      const hasApprovedLeave = res.data.some((leave: any) => leave.status === 'APPROVED' && leave.startDate.startsWith(todayStr));
       setIsLeaveToday(hasApprovedLeave);
-      setStats(prev => ({ ...prev, leaveRemaining: '12' }));
+      setStats(prev => ({ ...prev, leaveRemaining: `${balance}h` }));
     } catch (error: any) { console.log("Lỗi fetch phép:", error.message); }
   };
 

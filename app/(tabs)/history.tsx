@@ -305,7 +305,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F4F4FA' },
     headerWrap: { backgroundColor: '#FFF', paddingTop: 60, paddingBottom: 20, paddingHorizontal: 24, borderBottomLeftRadius: 35, borderBottomRightRadius: 35, elevation: 5, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 15, zIndex: 10 },
-    headerTitle: { fontSize: 24, fontWeight: '900', color: '#2A2640' },
+    headerTitle: { fontSize: 28, fontWeight: '900', color: '#1A1A24', letterSpacing: -0.5 },
     calendarWrap: { padding: 20 },
     calendarCard: { backgroundColor: '#FFF', borderRadius: 30, padding: 15, paddingBottom: 20, elevation: 3, shadowColor: '#6345E5', shadowOpacity: 0.05, shadowRadius: 15 },
     legend: { flexDirection: 'row', justifyContent: 'center', gap: 30, marginTop: 15 },
